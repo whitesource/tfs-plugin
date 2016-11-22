@@ -4,7 +4,7 @@
   "version": "0.0.15",
   "name": "WhiteSource",
   "description": "Identify the open source components in your software to detect & fix security vulnerabilities, problematic open source licenses and quality issues.",
-  "publisher": "whitesource",
+  "publisher": "ruslangogerman",
   "public": false,
   "targets": [
     {
