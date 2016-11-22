@@ -1,0 +1,81 @@
+{
+  "manifestVersion": 1,
+  "id": "whitesource",
+  "version": "0.0.15",
+  "name": "WhiteSource",
+  "description": "Identify the open source components in your software to detect & fix security vulnerabilities, problematic open source licenses and quality issues.",
+  "publisher": "whitesource",
+  "public": false,
+  "targets": [
+    {
+      "id": "Microsoft.VisualStudio.Services"
+    }
+  ],
+  "content": {
+    "details": {
+      "path": "details.md"
+    }
+  },
+  "categories": [
+    "Build and release"
+  ],
+  "branding": {
+    "color": "rgb(78, 104, 193)",
+    "theme": "dark"
+  },
+  "icons": {
+    "default": "images/logo.png"
+  },
+  "files": [
+    {
+      "path": "whitesource",
+      "addressable": true
+    },
+    {
+      "path": "images",
+      "addressable": true
+    }
+  ],
+
+  "contributions": [
+    {
+      "id": "task-hash-collector",
+      "type": "ms.vss-distributed-task.task",
+      "targets": [
+        "ms.vss-distributed-task.tasks"
+      ],
+      "properties": {
+        "name": "whitesource"
+      }
+    },
+    {
+      "id": "service-endpoint",
+      "description": "Service Endpoint type for WhiteSource connections",
+      "type": "ms.vss-endpoint.service-endpoint-type",
+      "targets": [
+        "ms.vss-endpoint.endpoint-types"
+      ],
+      "properties": {
+        "name": "whitesource",
+        "displayName": "WhiteSource",
+        "url": {
+          "displayName": "Server Url",
+          "helpText": "Url for the WhiteSource server to connect to."
+        },
+        "dataSources": [
+          {
+            "name": "WhiteSource Projects",
+            "endpointUrl": "{{endpoint.url}}/agent",
+            "resultSelector": "jsonpath:$[*].nm"
+          }
+        ],
+        "authenticationSchemes": [
+          {
+            "type": "ms.vss-endpoint.endpoint-auth-scheme-token"
+          }
+        ],
+        "helpMarkDown": "<a href=\"http://www.whitesourcesoftware.com/tfs_security/\" target=\"_blank\"><b>Learn More</b></a>"
+      }
+    }
+  ]
+}

@@ -1,0 +1,127 @@
+{
+  "id": "521D1E00-F5FB-4B73-A93B-B2FE88A9AF82",
+  "name": "WhiteSource",
+  "friendlyName": "WhiteSource",
+  "description": "WhiteSource integrates with your build process to detect all open source components in your software. Real-time alerts whenever a problematic component is added to your project and when a new security vulnerability is discovered in one of your open source components. Enabling you to remediate the issue as early as possible in the process",
+  "category": "Build",
+  "visibility": [
+    "Build"
+  ],
+  "author": "ortichon",
+  "version": {
+    "Major": 0,
+    "Minor": 0,
+    "Patch": 2
+  },
+  "demands": [
+    "node.js"
+  ],
+  "icons": {
+    "default": "logo.png"
+  },
+  "minimumAgentVersion": "1.91.0",
+  "instanceNameFormat": "WhiteSource $(message)",
+  "inputs": [
+    {
+      "name": "cwd",
+      "type": "filePath",
+      "label": "Work directory",
+      "defaultValue": "",
+      "required": true,
+      "helpMarkDown": "Current working directory when WhiteSource is run."
+    },
+    {
+      "name": "extensions",
+      "type": "string",
+      "label": "Extension list",
+      "defaultValue": ".dll",
+      "required": true,
+      "helpMarkDown": "List of extensions separated by space"
+    },
+    {
+      "name": "type",
+      "type": "pickList",
+      "label": "Check policies",
+      "defaultValue": "UPDATE",
+      "required": true,
+      "helpMarkDown": "",
+      "options": {
+        "UPDATE": "Send alerts",
+        "CHECK_POLICY_COMPLIANCE": "Fail the build"
+      }
+    },
+    {
+      "name": "productNameOrToken",
+      "type": "string",
+      "label": "Product name or token",
+      "defaultValue": "",
+      "required": false,
+      "helpMarkDown": "Name or token to uniquely identify the product to update. Tokens can be found in the administration section of your WhiteSource account. if you don't have any please contact your WhiteSource account administrator"
+    },
+    {
+      "name": "productVersion",
+      "type": "string",
+      "label": "Product version",
+      "defaultValue": "",
+      "required": false,
+      "helpMarkDown": "This is used to override any versions inferred by default. Version of the product to update."
+    },
+    {
+      "name": "requesterEmail",
+      "type": "string",
+      "label": "Requester email",
+      "defaultValue": "",
+      "required": false,
+      "helpMarkDown": "Email of the WhiteSource user that requests to update WhiteSource."
+    },
+    {
+      "name": "projectName",
+      "type": "string",
+      "label": "Project name",
+      "defaultValue": "",
+      "required": true,
+      "helpMarkDown": "Whitesource project name"
+    },
+    {
+      "name": "projectToken",
+      "type": "string",
+      "label": "Project token",
+      "defaultValue": "",
+      "required": false,
+      "helpMarkDown": "Token uniquely identifying the project to update. Tokens can be found in the administration section of your WhiteSource account.If you don't have any please contact your WhiteSource account administrator."
+    },
+    {
+      "name": "forceCheckAllDependencies",
+      "type": "boolean",
+      "label": "Force check all dependencies",
+      "defaultValue": false,
+      "required": false,
+      "helpMarkDown": " Policies will be checked only for new dependencies introduced to the WhiteSource projects. Only works when CHECK_POLICY_COMPLIANCE"
+    },
+    {
+      "name": "failOnError",
+      "type": "boolean",
+      "label": "Fail on error",
+      "defaultValue": true,
+      "required": false,
+      "helpMarkDown": "Indicates whether to fail the build on a general error (e.g. network error). Setting this to false means that the plugin will fail the build only for policy violations."
+    },
+    {
+      "name": "WhiteSourceService",
+      "type": "connectedService:WhiteSource",
+      "label": "WhiteSource endpoint",
+      "defaultValue": "",
+      "required": true,
+      "helpMarkDown": "Select the WhiteSource end point to use. If needed, click on 'manage', and add a new Service Endpoint of type 'WhiteSource server connection'"
+    }
+  ],
+  "files": {
+    "path": "images",
+    "addressable": true
+  },
+  "execution": {
+    "Node": {      "target": "testtask.js",
+      "argumentFormat": ""
+    }
+  }
+}
