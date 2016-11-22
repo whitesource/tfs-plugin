@@ -3,6 +3,7 @@
   "name": "WhiteSource",
   "friendlyName": "WhiteSource",
   "description": "WhiteSource integrates with your build process to detect all open source components in your software. Real-time alerts whenever a problematic component is added to your project and when a new security vulnerability is discovered in one of your open source components. Enabling you to remediate the issue as early as possible in the process",
+  "helpMarkDown": "whitesourcesoftware.com/how-to-install-tfs-extention/",
   "category": "Build",
   "visibility": [
     "Build"
@@ -11,7 +12,7 @@
   "version": {
     "Major": 0,
     "Minor": 0,
-    "Patch": 3
+    "Patch": 15
   },
   "demands": [
     "node.js"
