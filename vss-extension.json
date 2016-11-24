@@ -11,6 +11,9 @@
       "id": "Microsoft.VisualStudio.Services"
     }
   ],
+  "scopes": [
+    "vso.build_execute"
+  ],
   "content": {
     "details": {
       "path": "details.md"
@@ -28,6 +31,14 @@
   },
   "files": [
     {
+      "path": "infoTab.html",
+      "addressable": true
+    },
+    {
+      "path": "statusSection.html",
+      "addressable": true
+    },
+    {
       "path": "whitesource",
       "addressable": true
     },
@@ -38,6 +49,31 @@
   ],
 
   "contributions": [
+    {
+      "id": "build-info-tab",
+      "type": "ms.vss-build-web.build-results-tab",
+      "description": "A tab contributing to build results view",
+      "targets": [
+        "ms.vss-build-web.build-results-view"
+      ],
+      "properties": {
+        "name": "WhiteSource Tab",
+        "uri": "infoTab.html"
+      }
+    },
+    {
+      "id": "build-status-section",
+      "type": "ms.vss-build-web.build-results-section",
+      "description": "A section contributing to our own new tab and also to existing build 'summary' tab",
+      "targets": [
+        ".build-info-tab",
+        "ms.vss-build-web.build-results-summary-tab"
+      ],
+      "properties": {
+        "name": "WhiteSource Section",
+        "uri": "statusSection.html"
+      }
+    },
     {
       "id": "task-hash-collector",
       "type": "ms.vss-distributed-task.task",
