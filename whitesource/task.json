@@ -2,8 +2,8 @@
   "id": "521D1E00-F5FB-4B73-A93B-B2FE88A9AF82",
   "name": "WhiteSource",
   "friendlyName": "WhiteSource",
-  "description": "WhiteSource integrates with your build process to detect all open source components in your software. Real-time alerts whenever a problematic component is added to your project and when a new security vulnerability is discovered in one of your open source components. Enabling you to remediate the issue as early as possible in the process",
-  "helpMarkDown": "whitesourcesoftware.com/how-to-install-tfs-extention/",
+  "description": "Identify the open source components in your software to detect & fix security vulnerabilities, problematic open source licenses and quality issues.",
+  "helpMarkDown": "http://www.whitesourcesoftware.com/how-to-install-tfs-extention",
   "category": "Build",
   "visibility": [
     "Build"
@@ -12,7 +12,7 @@
   "version": {
     "Major": 0,
     "Minor": 0,
-    "Patch": 15
+    "Patch": 16
   },
   "demands": [
     "node.js"
@@ -27,7 +27,7 @@
       "name": "cwd",
       "type": "filePath",
       "label": "Work directory",
-      "defaultValue": "",
+      "defaultValue": "$(Build.SourcesDirectory)",
       "required": true,
       "helpMarkDown": "Current working directory when WhiteSource is run."
     },
@@ -121,7 +121,8 @@
     "addressable": true
   },
   "execution": {
-    "Node": {      "target": "testtask.js",
+    "Node": {
+      "target": "testtask.js",
       "argumentFormat": ""
     }
   }

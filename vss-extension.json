@@ -1,7 +1,7 @@
 {
   "manifestVersion": 1,
   "id": "whitesource",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "name": "WhiteSource",
   "description": "Identify the open source components in your software to detect & fix security vulnerabilities, problematic open source licenses and quality issues.",
   "publisher": "ruslangogerman",
@@ -36,7 +36,6 @@
       "addressable": true
     }
   ],
-
   "contributions": [
     {
       "id": "task-hash-collector",
