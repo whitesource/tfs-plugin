@@ -155,8 +155,8 @@ var createRejectionList = function (currentNode) {
 
 createRejectionList(resData);
 
-var wssResult = __dirname + '\\result.md';
-console.log("##vso[task.addattachment type=Distributedtask.Core.Summary;name=Wss Report;]" + wssResult);
+ var wssResult = __dirname + '\\result.md';
+ console.log("##vso[task.addattachment type=Distributedtask.Core.Summary;name=Wss Report;]" + wssResult);
 
 // +-------------------+
 // | Build Termination |

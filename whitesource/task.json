@@ -2,7 +2,7 @@
   "id": "521D1E00-F5FB-4B73-A93B-B2FE88A9AF82",
   "name": "WhiteSource",
   "friendlyName": "WhiteSource",
-  "description": "Identify the open source components in your software to detect & fix security vulnerabilities, problematic open source licenses and quality issues.",
+  "description": "Detect & fix security vulnerabilities, problematic open source licenses and quality issues.",
   "helpMarkDown": "http://www.whitesourcesoftware.com/how-to-install-tfs-extention",
   "category": "Build",
   "visibility": [
@@ -12,7 +12,7 @@
   "version": {
     "Major": 0,
     "Minor": 0,
-    "Patch": 16
+    "Patch": 18
   },
   "demands": [
     "node.js"
@@ -122,7 +122,7 @@
   },
   "execution": {
     "Node": {
-      "target": "testtask.js",
+      "target": "WssTask.js",
       "argumentFormat": ""
     }
   }

@@ -1,9 +1,9 @@
 {
   "manifestVersion": 1,
   "id": "whitesource",
-  "version": "0.0.16",
+  "version": "0.0.18",
   "name": "WhiteSource",
-  "description": "Identify the open source components in your software to detect & fix security vulnerabilities, problematic open source licenses and quality issues.",
+  "description": "Detect & fix security vulnerabilities, problematic open source licenses and quality issues.",
   "publisher": "ruslangogerman",
   "public": false,
   "targets": [
@@ -73,7 +73,7 @@
             "type": "ms.vss-endpoint.endpoint-auth-scheme-token"
           }
         ],
-        "helpMarkDown": "<a href=\"http://www.whitesourcesoftware.com/tfs_security/\" target=\"_blank\"><b>Learn More</b></a>"
+        "helpMarkDown": "<a href=\"http://www.whitesourcesoftware.com/tfs_security\" target=\"_blank\"><b>Learn More</b></a>"
       }
     }
   ]
