@@ -13,6 +13,7 @@ const hostUrl = tl.getEndpointUrl(service, false);
 const auth = tl.getEndpointAuthorization(service, false);
 var projectDir = tl.getPathInput('cwd', false);
 var extensionsToHash = tl.getDelimitedInput('extensions', ' ', true);
+var excludeFolders = tl.getDelimitedInput('exclude',' ',true);
 
 // +-------------+
 // | User Inputs |
@@ -20,7 +21,8 @@ var extensionsToHash = tl.getDelimitedInput('extensions', ' ', true);
 
 // Mandatory Fields
 var type = tl.getInput('type', true);
-if(type == "CHECK_POLICY_COMPLIANCE"){}
+if (type == "CHECK_POLICY_COMPLIANCE") {
+}
 var projectName = tl.getInput('projectName', true);
 
 // Optional Fields
@@ -63,7 +65,7 @@ directoryList.forEach(function (file) {
         addToDependencies(file.name, fullPath, lastModified);
     }
 });
-function createPostRequest(){
+function createPostRequest() {
     var post_data = querystring.stringify({
         "agent": "tfs-plugin",
         "agentVersion": "1.0",
@@ -78,21 +80,8 @@ function createPostRequest(){
     });
     return post_data;
 }
-if(type == "CHECK_POLICY_COMPLIANCE") {
-// Build the post string from an object
-//     var post_data = querystring.stringify({
-//         "agent": "tfs-plugin",
-//         "agentVersion": "1.0",
-//         "type": type,
-//         "token": auth.parameters.apitoken,
-//         "timeStamp": new Date().getTime(),
-//         "product": product,
-//         "productVersion": productVersion,
-//         "requesterEmail": requesterEmail,
-//         "projectToken": projectToken,
-//         "forceCheckAllDependencies": forceCheckAllDependencies
-//     });
-     var post_data = createPostRequest() + "&diff=" + JSON.stringify(diff);
+if (type == "CHECK_POLICY_COMPLIANCE") {
+    var post_data = createPostRequest() + "&diff=" + JSON.stringify(diff);
 
 
 // +------------+
@@ -304,10 +293,9 @@ if (rejectionNum != 0) {
     process.exit(1);
 }
 else {
-    creatResultOutput(resData);
+    // creatResultOutput(resData);
     console.log('No policy rejections found');
 }
-
 
 
 // var wssResult = __dirname + '\\realResult.md';
@@ -367,7 +355,7 @@ else {
 // +------------------+
 
 function creatResultOutput(responseData) {
-    var wssResult = __dirname + path.sep+ 'realResult.md';
+    var wssResult = __dirname + path.sep + 'realResult.md';
     console.log(responseData);
     var totalProjects = responseData.projects;
     console.log(totalProjects);
@@ -393,6 +381,13 @@ function creatResultOutput(responseData) {
 
 function readDirRecursive(dir, fileList) {
     var notPermittedFolders = [];
+    var baseFolderName = path.parse(dir).base;
+    if(excludeFolders.indexOf(baseFolderName) >-1){
+        console.log("Exclude folder found: " + baseFolderName);
+        return {
+            fileList: []
+        };
+    }
     try {
         var files = fs.readdirSync(dir);
     }

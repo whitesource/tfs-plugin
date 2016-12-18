@@ -12,7 +12,7 @@
   "version": {
     "Major": 0,
     "Minor": 0,
-    "Patch": 18
+    "Patch": 21
   },
   "demands": [
     "node.js"
@@ -38,6 +38,14 @@
       "defaultValue": ".dll",
       "required": true,
       "helpMarkDown": "List of extensions separated by space"
+    },
+    {
+      "name": "exclude",
+      "type": "string",
+      "label": "Exclude list",
+      "defaultValue": "",
+      "required": false,
+      "helpMarkDown": "List of exclude folders separated by space"
     },
     {
       "name": "type",
