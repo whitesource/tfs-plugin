@@ -1,0 +1,4 @@
+.idea
+*.vsix
+node_modules/
+.idea/
