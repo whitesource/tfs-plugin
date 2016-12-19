@@ -1,7 +1,7 @@
 {
   "manifestVersion": 1,
   "id": "whitesource",
-  "version": "0.0.21",
+  "version": "0.0.23",
   "name": "WhiteSource",
   "description": "Detect & fix security vulnerabilities, problematic open source licenses and quality issues.",
   "publisher": "ruslangogerman",

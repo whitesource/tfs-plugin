@@ -65,23 +65,6 @@ directoryList.forEach(function (file) {
         addToDependencies(file.name, fullPath, lastModified);
     }
 });
-function createPostRequest() {
-    var post_data = querystring.stringify({
-        "agent": "tfs-plugin",
-        "agentVersion": "1.0",
-        "type": "CHECK_POLICY_COMPLIANCE",
-        "token": auth.parameters.apitoken,
-        "timeStamp": new Date().getTime(),
-        "product": product,
-        "productVersion": productVersion,
-        "requesterEmail": requesterEmail,
-        "projectToken": projectToken,
-        "forceCheckAllDependencies": forceCheckAllDependencies
-    });
-    return post_data;
-}
-// if (type == "CHECK_POLICY_COMPLIANCE") {
-var post_data = createPostRequest() + "&diff=" + JSON.stringify(diff);
 
 
 // +------------+
@@ -93,7 +76,7 @@ var syncRes = syncRequest('POST', hostUrl, {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Charset': 'utf-8'
     },
-    body: post_data,
+    body: createPostRequest("CHECK_POLICY_COMPLIANCE") + "&diff=" + JSON.stringify(diff),
     timeout: 600000
 });
 var totalFiles = JSON.stringify(diff[0].dependencies.length);
@@ -103,23 +86,24 @@ console.log('Total files was scanned: ' + totalFiles);
 console.log('Checking for rejections');
 var responseBody = syncRes.getBody('utf8');
 if (isJson(responseBody)) {
+    //noinspection JSUnresolvedFunction
     var parsedRes = JSON.parse(syncRes.getBody('utf8'));
     if (parsedRes.status == 2) { //STATUS_BAD_REQUEST
-        logError('Server responded with status "Bad Request", Please check your credentials');
-        logError('Terminating Build');
+        logError(error, 'Server responded with status "Bad Request", Please check your credentials');
+        logError(error, 'Terminating Build');
         process.exit(1);
     }
     else if (parsedRes.status == 3) { //STATUS_SERVER_ERROR
-        logError('Server responded with status "Server Error", please try again');
-        logError('Terminating Build');
+        logError(error, 'Server responded with status "Server Error", please try again');
+        logError(error, 'Terminating Build');
         process.exit(1);
     }
 
 }
 else {
-    logError('Server responded with object other than "JSON"');
-    logError(responseBody);
-    logError('Terminating Build');
+    logError(error, 'Server responded with object other than "JSON"');
+    logError(error, responseBody);
+    logError(error, 'Terminating Build');
     process.exit(1);
 }
 
@@ -169,13 +153,16 @@ var rejectionNum = rejectionList.length;
 
 
 if (rejectionNum != 0) {
-    logError("Found" + rejectionNum + ' policy rejections');
-    logError('Files: ');
+    // console.log('##vso[task.logissue type=warning]' + "Found " + rejectionNum + " policy rejections");
+    logError('warning', "Found" + rejectionNum + ' policy rejections');
+    // console.log('##vso[task.logissue type=warning]' + 'Files: ');
+    logError('warning', 'Files: ');
     rejectionList.forEach(function (rejection) {
-        logError(rejection);
+        // console.log('##vso[task.logissue type=warning]' + rejection);
+        logError('warning', rejection);
     });
-    if (type == "CHECK_POLICY_COMPLIANCE") {
-        logError('Terminating Build');
+    if (type == "FAIL_ON_BUILD") {
+        logError('error', 'Terminating Build');
         process.exit(1);
     }
 }
@@ -185,42 +172,40 @@ else {
 }
 
 // SECOND POST
-
-// Build the post string from an object
-var post_data = querystring.stringify({
-    "agent": "tfs-plugin",
-    "agentVersion": "1.0",
-    "type": "UPDATE",
-    "token": auth.parameters.apitoken,
-    "timeStamp": new Date().getTime(),
-    "product": product,
-    "productVersion": productVersion,
-    "requesterEmail": requesterEmail,
-    "projectToken": projectToken,
-    "forceCheckAllDependencies": forceCheckAllDependencies
-});
-post_data = post_data + "&diff=" + JSON.stringify(diff);
-
 // +------------+
 // | Sync POST |
 // +------------+
 console.log('Sending data to Whitesource server');
-var syncRes = syncRequest('POST', hostUrl, {
+syncRequest('POST', hostUrl, {
     headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Charset': 'utf-8'
     },
-    body: post_data,
+    body: createPostRequest("UPDATE") + "&diff=" + JSON.stringify(diff),
     timeout: 600000
 });
-var totalFiles = JSON.stringify(diff[0].dependencies.length);
-console.log('Total files was scanned: ' + totalFiles);
+
 
 console.log("Upload process done");
 
 // +------------------+
 // | Define functions |
 // +------------------+
+
+function createPostRequest(type) {
+    return querystring.stringify({
+        "agent": "tfs-plugin",
+        "agentVersion": "1.0",
+        "type": type,
+        "token": auth.parameters.apitoken,
+        "timeStamp": new Date().getTime(),
+        "product": product,
+        "productVersion": productVersion,
+        "requesterEmail": requesterEmail,
+        "projectToken": projectToken,
+        "forceCheckAllDependencies": forceCheckAllDependencies
+    });
+}
 
 function creatResultOutput(responseData) {
     var wssResult = __dirname + path.sep + 'realResult.md';
@@ -235,9 +220,8 @@ function creatResultOutput(responseData) {
         var projectAlerts = totalProjects[0].totalAlerts;
         var projectVulnerable = totalProjects[0].totalVulnerableLibraries;
         var projectPolicy = totalProjects[0].totalPolicyViolations;
-// ToDo: maybe add server time instead of client time
-        var formatted = moment(totalProjects[0].date, 'MMM D, YYYY h:mm:ss A').format('dddd, MMMM D, YYYY h:mm A');
-        var projectDate = formatted;
+        // ToDo: maybe add server time instead of client time
+        var projectDate = moment(totalProjects[0].date, 'MMM D, YYYY h:mm:ss A').format('dddd, MMMM D, YYYY h:mm A');
     }
     var mdFile = '<div style="padding:5px 0px"> <span>Vulnerabilities Summary:</span> </div> <table border="0" style="border-top: 1px solid #eee;border-collapse: separate;border-spacing: 0 2px;"> <table> <tr> <td>Project name</td> <td></td> <td>' + projectName + '</td> </tr> <tr> <td>Project url:</td> <td></td> <td>' + projectUrl + '</td> </tr> <tr> <td>Project new</td> <td></td> <td>' + projectNew + '</td> </tr> <tr> <td>Project totalAlerts</td> <td></td> <td>' + projectAlerts + '</td> </tr> <tr> <td>Project totalVulnerableLibraries</td> <td></td> <td>' + projectVulnerable + '</td> </tr> <tr> <td>Project totalPolicyViolations</td> <td></td> <td>' + projectPolicy + '</td> </tr> <tr> <td>Project date</td> <td></td> <td>' + projectDate + '</td> </tr> </table> <a target="_blank" href="https://saas.whitesourcesoftware.com/Wss/WSS.html">For more Information</a> </div>';
     fs.writeFile(wssResult, mdFile, function (err) {
@@ -253,7 +237,7 @@ function readDirRecursive(dir, fileList) {
         var files = fs.readdirSync(dir);
     }
     catch (err) {
-        logError(err);
+        logError('error', err);
         return {
             fileList: []
         };
@@ -266,7 +250,7 @@ function readDirRecursive(dir, fileList) {
             fs.statSync(dir + path.sep + file).isDirectory();
         }
         catch (err) {
-            logError(err);
+            logError('error', err);
             notPermittedFolders.push(file);
             continue;
         }
@@ -335,12 +319,12 @@ function isJson(str) {
         JSON.parse(str);
     }
     catch (err) {
-        logError(err);
+        logError('error', err);
         return false;
     }
     return true;
 }
 
-function logError(str) {
-    console.log('##vso[task.logissue type=error]' + str);
+function logError(type, str) {
+    console.log('##vso[task.logissue type=' + type + ']' + str);
 }

@@ -12,7 +12,7 @@
   "version": {
     "Major": 0,
     "Minor": 0,
-    "Patch": 21
+    "Patch": 23
   },
   "demands": [
     "node.js"
@@ -51,12 +51,12 @@
       "name": "type",
       "type": "pickList",
       "label": "Check policies",
-      "defaultValue": "UPDATE",
+      "defaultValue": "SEND_ALERTS",
       "required": true,
       "helpMarkDown": "",
       "options": {
-        "UPDATE": "Send alerts",
-        "CHECK_POLICY_COMPLIANCE": "Fail the build"
+        "SEND_ALERTS": "Send alerts",
+        "FAIL_ON_BUILD": "Fail on build"
       }
     },
     {
@@ -87,7 +87,7 @@
       "name": "projectName",
       "type": "string",
       "label": "Project name",
-      "defaultValue": "",
+      "defaultValue": "$(Build.Repository.Name)",
       "required": true,
       "helpMarkDown": "Whitesource project name"
     },
