@@ -7,7 +7,8 @@ var fs = require('fs'),
     querystring = require('querystring'),
     syncRequest = require('sync-request'),
     tl = require('vsts-task-lib/task'),
-    fileMatch = require('file-match');
+    fileMatch = require('file-match'),
+    values = require('object.values');
 
 var service = tl.getInput('WhiteSourceService', false);
 const hostUrl = tl.getEndpointUrl(service, false);
@@ -82,7 +83,6 @@ var syncRes = syncRequest('POST', hostUrl, {
 var totalFiles = JSON.stringify(diff[0].dependencies.length);
 console.log('Total files was scanned: ' + totalFiles);
 
-
 console.log('Checking for rejections');
 var responseBody = syncRes.getBody('utf8');
 if (isJson(responseBody)) {
@@ -143,6 +143,16 @@ var createRejectionList = function (currentNode) {
 };
 
 var resData = JSON.parse(parsedRes.data);
+console.log("This is from Agent: \n" + JSON.stringify(resData, null, 2) + "\n");
+console.log("Inside Json: " + JSON.stringify(resData.projectNewResources, null, 2) + "\n");
+var myArray = values(resData.projectNewResources)[0];
+for (var i = 0; i < myArray.length; i++) {
+    console.log("for -> displayName: " + myArray[i].displayName + "\n");
+    console.log("for -> link: " + myArray[i].link + "\n");
+    console.log("for -> licenses: " + myArray[i].licenses + "\n");
+    console.log("for -> sha1: " + myArray[i].sha1 + "\n");
+    console.log("for -> vulnerabilities: " + myArray[i].vulnerabilities + "\n");
+}
 createRejectionList(resData);
 var rejectionNum = rejectionList.length;
 
@@ -153,12 +163,9 @@ var rejectionNum = rejectionList.length;
 
 
 if (rejectionNum != 0) {
-    // console.log('##vso[task.logissue type=warning]' + "Found " + rejectionNum + " policy rejections");
     logError('warning', "Found" + rejectionNum + ' policy rejections');
-    // console.log('##vso[task.logissue type=warning]' + 'Files: ');
     logError('warning', 'Files: ');
     rejectionList.forEach(function (rejection) {
-        // console.log('##vso[task.logissue type=warning]' + rejection);
         logError('warning', rejection);
     });
     if (type == "FAIL_ON_BUILD") {
