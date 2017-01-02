@@ -143,16 +143,6 @@ var createRejectionList = function (currentNode) {
 };
 
 var resData = JSON.parse(parsedRes.data);
-console.log("This is from Agent: \n" + JSON.stringify(resData, null, 2) + "\n");
-console.log("Inside Json: " + JSON.stringify(resData.projectNewResources, null, 2) + "\n");
-var myArray = values(resData.projectNewResources)[0];
-for (var i = 0; i < myArray.length; i++) {
-    console.log("for -> displayName: " + myArray[i].displayName + "\n");
-    console.log("for -> link: " + myArray[i].link + "\n");
-    console.log("for -> licenses: " + myArray[i].licenses + "\n");
-    console.log("for -> sha1: " + myArray[i].sha1 + "\n");
-    console.log("for -> vulnerabilities: " + myArray[i].vulnerabilities + "\n");
-}
 createRejectionList(resData);
 var rejectionNum = rejectionList.length;
 
@@ -163,8 +153,7 @@ var rejectionNum = rejectionList.length;
 
 
 if (rejectionNum != 0) {
-    logError('warning', "Found" + rejectionNum + ' policy rejections');
-    logError('warning', 'Files: ');
+    logError('warning', "Found " + rejectionNum + ' policy rejections');
     rejectionList.forEach(function (rejection) {
         logError('warning', rejection);
     });
@@ -174,7 +163,6 @@ if (rejectionNum != 0) {
     }
 }
 else {
-    //creatResultOutput(resData);
     console.log('No policy rejections found');
 }
 
@@ -334,4 +322,18 @@ function isJson(str) {
 
 function logError(type, str) {
     console.log('##vso[task.logissue type=' + type + ']' + str);
+}
+
+function printInfo() {
+    console.log("This is from Agent: \n" + JSON.stringify(resData, null, 2) + "\n");
+    console.log("Inside Json: " + JSON.stringify(resData.projectNewResources, null, 2) + "\n");
+    var myArray = values(resData.projectNewResources)[0];
+    for (var i = 0; i < myArray.length; i++) {
+        console.log("for -> displayName: " + myArray[i].displayName + "\n");
+        console.log("for -> link: " + myArray[i].link + "\n");
+        console.log("for -> licenses: " + myArray[i].licenses + "\n");
+        console.log("for -> sha1: " + myArray[i].sha1 + "\n");
+        console.log("for -> vulnerabilities: " + myArray[i].vulnerabilities + "\n");
+    }
+
 }

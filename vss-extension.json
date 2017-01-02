@@ -1,11 +1,11 @@
 {
   "manifestVersion": 1,
   "id": "whitesource",
-  "version": "0.0.24",
+  "version": "0.0.25",
   "name": "WhiteSource",
   "description": "Detect & fix security vulnerabilities, problematic open source licenses and quality issues.",
-  "publisher": "ruslangogerman",
-  "public": false,
+  "publisher": "whitesource",
+  "public": true,
   "targets": [
     {
       "id": "Microsoft.VisualStudio.Services"
