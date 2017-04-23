@@ -11,8 +11,8 @@
   "author": "WhiteSource",
   "version": {
     "Major": 0,
-    "Minor": 0,
-    "Patch": 25
+    "Minor": 1,
+    "Patch": 5
   },
   "demands": [
     "node.js"
@@ -48,7 +48,7 @@
       "helpMarkDown": "List of exclude folders separated by space"
     },
     {
-      "name": "type",
+      "name": "checkPolicies",
       "type": "pickList",
       "label": "Check policies",
       "defaultValue": "SEND_ALERTS",
@@ -106,6 +106,14 @@
       "defaultValue": false,
       "required": false,
       "helpMarkDown": " Policies will be checked only for new dependencies introduced to the WhiteSource projects. Only works when CHECK_POLICY_COMPLIANCE"
+    },
+    {
+      "name": "forceUpdate",
+      "type": "boolean",
+      "label": "Force update",
+      "defaultValue": false,
+      "required": false,
+      "helpMarkDown": "Force update no matter if there is any policy failure"
     },
     {
       "name": "failOnError",

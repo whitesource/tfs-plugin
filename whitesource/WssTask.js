@@ -23,7 +23,7 @@ var filter = fileMatch(excludeFolders);
 // +-------------+
 
 // Mandatory Fields
-var type = tl.getInput('type', true);
+var checkPolicies = tl.getInput('checkPolicies', true);
 var projectName = tl.getInput('projectName', true);
 
 // Optional Fields
@@ -32,6 +32,7 @@ var productVersion = tl.getInput('productVersion', false);
 var requesterEmail = tl.getInput('requesterEmail', false);
 var projectToken = tl.getInput('projectToken', false);
 var forceCheckAllDependencies = tl.getInput('forceCheckAllDependencies', false);
+var forceUpdate = tl.getInput('forceUpdate', false);
 
 
 // Create the "diff" JSON attribute
@@ -49,7 +50,7 @@ var readDirObject = readDirRecursive(projectDir);
 var directoryList = readDirObject.fileList;
 var notPermittedFolders = readDirObject.notPermittedFolders;
 
-if (notPermittedFolders.length != 0) {
+if (notPermittedFolders.length !== 0) {
     console.log('Skipping the following folders due to insufficient permissions:');
     console.log('---------------------------------------------------------------');
     notPermittedFolders.forEach(function (folder) {
@@ -88,12 +89,12 @@ var responseBody = syncRes.getBody('utf8');
 if (isJson(responseBody)) {
     //noinspection JSUnresolvedFunction
     var parsedRes = JSON.parse(syncRes.getBody('utf8'));
-    if (parsedRes.status == 2) { //STATUS_BAD_REQUEST
+    if (parsedRes.status === 2) { //STATUS_BAD_REQUEST
         logError(error, 'Server responded with status "Bad Request", Please check your credentials');
         logError(error, 'Terminating Build');
         process.exit(1);
     }
-    else if (parsedRes.status == 3) { //STATUS_SERVER_ERROR
+    else if (parsedRes.status === 3) { //STATUS_SERVER_ERROR
         logError(error, 'Server responded with status "Server Error", please try again');
         logError(error, 'Terminating Build');
         process.exit(1);
@@ -111,22 +112,22 @@ var rejectionList = [];
 
 var createRejectionList = function (currentNode) {
     // the node is a leaf
-    if (typeof currentNode == 'string') {
+    if (typeof currentNode === 'string') {
         return;
     }
     // the node is children array
-    else if (Array.isArray(currentNode) && currentNode.length != 0) {
+    else if (Array.isArray(currentNode) && currentNode.length !== 0) {
         currentNode.forEach(function (child) {
             createRejectionList(child);
         })
     } else {
         // The node if object or empty array
         var objKeys = Object.keys(currentNode);
-        if (objKeys.length != 0) {
+        if (objKeys.length !== 0) {
             // The node is non empty object
             var policyIndex = objKeys.indexOf('policy');
             // There is a rejected policy
-            if (policyIndex != -1 && currentNode.policy.actionType == 'Reject') {
+            if (policyIndex !== -1 && currentNode.policy.actionType === 'Reject') {
                 var file_name = currentNode.resource.displayName;
                 rejectionList.push(file_name);
             } else {
@@ -152,18 +153,21 @@ var rejectionNum = rejectionList.length;
 // +--------------------+
 
 
-if (rejectionNum != 0) {
+if (rejectionNum !== 0) {
     logError('warning', "Found " + rejectionNum + ' policy rejections');
     rejectionList.forEach(function (rejection) {
         logError('warning', rejection);
     });
-    if (type == "FAIL_ON_BUILD") {
+    if (forceUpdate === "true") {
+        console.log('warning', "Some dependencies violate open source policies, however all were force updated to organization inventory.");
+    }
+    if (forceUpdate === "false" && checkPolicies === "FAIL_ON_BUILD") {
         logError('error', 'Terminating Build');
         process.exit(1);
     }
 }
 else {
-    console.log('No policy rejections found');
+    console.log('All dependencies conform with open source policies.');
 }
 
 // SECOND POST
@@ -208,7 +212,7 @@ function creatResultOutput(responseData) {
     var totalProjects = responseData.projects;
     console.log(totalProjects);
 //WRITING RESULT FILE
-    if (totalProjects[0] != null) {
+    if (totalProjects[0] !== null) {
         var projectName = totalProjects[0].name;
         var projectUrl = totalProjects[0].url;
         var projectNew = totalProjects[0].newlyCreated;
