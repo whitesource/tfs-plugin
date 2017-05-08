@@ -158,13 +158,6 @@ if (rejectionNum !== 0) {
     rejectionList.forEach(function (rejection) {
         logError('warning', rejection);
     });
-    if (forceUpdate === "true") {
-        console.log('warning', "Some dependencies violate open source policies, however all were force updated to organization inventory.");
-    }
-    if (forceUpdate === "false" && checkPolicies === "FAIL_ON_BUILD") {
-        logError('error', 'Terminating Build');
-        process.exit(1);
-    }
 }
 else {
     console.log('All dependencies conform with open source policies.');
@@ -174,18 +167,36 @@ else {
 // +------------+
 // | Sync POST |
 // +------------+
-console.log('Sending data to Whitesource server');
-syncRequest('POST', hostUrl, {
-    headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Charset': 'utf-8'
-    },
-    body: createPostRequest("UPDATE") + "&diff=" + JSON.stringify(diff),
-    timeout: 600000
-});
-
-
-console.log("Upload process done");
+if (rejectionNum !== 0) {
+    if (forceUpdate === "true") {
+        console.log('Sending data to Whitesource server');
+        syncRequest('POST', hostUrl, {
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Charset': 'utf-8'
+            },
+            body: createPostRequest("UPDATE") + "&diff=" + JSON.stringify(diff),
+            timeout: 600000
+        });
+        console.log("Upload process done");
+        console.log('warning', "Some dependencies violate open source policies, however all were force updated to organization inventory.");
+    }
+    if (checkPolicies === "FAIL_ON_BUILD") {
+        logError('error', 'Terminating Build');
+        process.exit(1);
+    }
+} else {
+    console.log('Sending data to Whitesource server');
+    syncRequest('POST', hostUrl, {
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Charset': 'utf-8'
+        },
+        body: createPostRequest("UPDATE") + "&diff=" + JSON.stringify(diff),
+        timeout: 600000
+    });
+    console.log("Upload process done");
+}
 
 // +------------------+
 // | Define functions |
