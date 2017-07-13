@@ -73,20 +73,26 @@ directoryList.forEach(function (file) {
 // | Sync POST |
 // +------------+
 console.log('Sending data to Whitesource server');
-var syncRes = syncRequest('POST', hostUrl, {
+
+var fullRequest = {
     headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Charset': 'utf-8'
     },
     body: createPostRequest("CHECK_POLICY_COMPLIANCE") + "&diff=" + JSON.stringify(diff),
     timeout: 3600000
-});
-var totalFiles = JSON.stringify(diff[0].dependencies.length);
-console.log('Total files was scanned: ' + totalFiles);
+};
+tl.debug('Full post request as sent to server: ' + JSON.stringify(fullRequest));
 
-console.log('Checking for rejections');
+var syncRes = syncRequest('POST', hostUrl, fullRequest);
+
+var totalFiles = JSON.stringify(diff[0].dependencies.length);
+console.log('Total files found: ' + totalFiles);
+
+console.log('Checking for policy rejections');
 var responseBody = syncRes.getBody('utf8');
 if (isJson(responseBody)) {
+    tl.debug('Server response: ' + JSON.stringify(responseBody));
     //noinspection JSUnresolvedFunction
     var parsedRes = JSON.parse(syncRes.getBody('utf8'));
     if (parsedRes.status === 2) { //STATUS_BAD_REQUEST
@@ -170,16 +176,18 @@ else {
 if (rejectionNum !== 0) {
     if (forceUpdate === "true") {
         console.log('Sending data to Whitesource server');
-        syncRequest('POST', hostUrl, {
+        var forceUpdateRequest = {
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'Charset': 'utf-8'
             },
             body: createPostRequest("UPDATE") + "&diff=" + JSON.stringify(diff),
             timeout: 3600000
-        });
+        };
+        tl.debug('Full force update post request as sent to server: ' + JSON.stringify(forceUpdateRequest));
+        syncRequest('POST', hostUrl, forceUpdateRequest);
         console.log("Upload process done");
-        console.log('warning', "Some dependencies violate open source policies, however all were force updated to organization inventory.");
+        console.log('warning', "Organization was updated even though some dependencies violate organizational policies.");
     }
     if (checkPolicies === "FAIL_ON_BUILD") {
         logError('error', 'Terminating Build');
@@ -187,14 +195,16 @@ if (rejectionNum !== 0) {
     }
 } else {
     console.log('Sending data to Whitesource server');
-    syncRequest('POST', hostUrl, {
+    var updateRequest = {
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
             'Charset': 'utf-8'
         },
         body: createPostRequest("UPDATE") + "&diff=" + JSON.stringify(diff),
         timeout: 3600000
-    });
+    };
+    tl.debug('Full update post request without rejection as sent to server: ' + JSON.stringify(updateRequest));
+    syncRequest('POST', hostUrl, updateRequest);
     console.log("Upload process done");
 }
 
