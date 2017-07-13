@@ -79,7 +79,7 @@ var syncRes = syncRequest('POST', hostUrl, {
         'Charset': 'utf-8'
     },
     body: createPostRequest("CHECK_POLICY_COMPLIANCE") + "&diff=" + JSON.stringify(diff),
-    timeout: 600000
+    timeout: 3600000
 });
 var totalFiles = JSON.stringify(diff[0].dependencies.length);
 console.log('Total files was scanned: ' + totalFiles);
@@ -176,7 +176,7 @@ if (rejectionNum !== 0) {
                 'Charset': 'utf-8'
             },
             body: createPostRequest("UPDATE") + "&diff=" + JSON.stringify(diff),
-            timeout: 600000
+            timeout: 3600000
         });
         console.log("Upload process done");
         console.log('warning', "Some dependencies violate open source policies, however all were force updated to organization inventory.");
@@ -193,7 +193,7 @@ if (rejectionNum !== 0) {
             'Charset': 'utf-8'
         },
         body: createPostRequest("UPDATE") + "&diff=" + JSON.stringify(diff),
-        timeout: 600000
+        timeout: 3600000
     });
     console.log("Upload process done");
 }
