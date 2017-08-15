@@ -6,95 +6,86 @@ var fs = require('fs'),
     querystring = require('querystring'),
     tl = require('vsts-task-lib/task'),
     fileMatch = require('file-match'),
-    request = require('request');
+    request = require('request'),
+    httpsProxyAgent = require('https-proxy-agent');
 
+// Plugin configuration params
+
+const WsService = tl.getInput('WhiteSourceService', false);
+const DestinationUrl = tl.getEndpointUrl(WsService, false);
+const ServiceAuthorization = tl.getEndpointAuthorization(WsService, false);
+const Cwd = tl.getPathInput('cwd', false);
+
+// User Mandatory Fields
+const CheckPoliciesAction = tl.getInput('checkPolicies', true);
+const ProjectName = tl.getInput('projectName', true);
+const IncludedExtensions = tl.getDelimitedInput('extensions', ' ', true);
+
+// User Optional Fields
+const ExcludeFolders = tl.getDelimitedInput('exclude', ' ', false);
+const Product = tl.getInput('productNameOrToken', false);
+const ProductVersion = tl.getInput('productVersion', false);
+const RequesterEmail = tl.getInput('requesterEmail', false);
+const ProjectToken = tl.getInput('projectToken', false);
+const isForceCheckAllDependencies = tl.getInput('forceCheckAllDependencies', false);
+const isForceUpdate = tl.getInput('forceUpdate', false);
+
+// General global variables
+const PLUGIN_VERSION = '0.1.9';
 const REQUEST_TYPE = {
-        CHECK_POLICY_COMPLIANCE: 'CHECK_POLICY_COMPLIANCE',
-        UPDATE: 'UPDATE'
+    CHECK_POLICY_COMPLIANCE: 'CHECK_POLICY_COMPLIANCE',
+    UPDATE: 'UPDATE'
 };
 
 var foundRejections = false;
+var filter = fileMatch(ExcludeFolders);
+var httpsProxy = undefined;
 
-var service = tl.getInput('WhiteSourceService', false);
-const hostUrl = tl.getEndpointUrl(service, false);
-const auth = tl.getEndpointAuthorization(service, false);
-var projectDir = tl.getPathInput('cwd', false);
-var extensionsToHash = tl.getDelimitedInput('extensions', ' ', true);
-var excludeFolders = tl.getDelimitedInput('exclude', ' ', false);
-var filter = fileMatch(excludeFolders);
-
-// +-------------+
-// | User Inputs |
-// +-------------+
-
-// Mandatory Fields
-var checkPolicies = tl.getInput('checkPolicies', true);
-var projectName = tl.getInput('projectName', true);
-
-// Optional Fields
-var product = tl.getInput('productNameOrToken', false);
-var productVersion = tl.getInput('productVersion', false);
-var requesterEmail = tl.getInput('requesterEmail', false);
-var projectToken = tl.getInput('projectToken', false);
-var forceCheckAllDependencies = tl.getInput('forceCheckAllDependencies', false);
-var forceUpdate = tl.getInput('forceUpdate', false);
-
-
+// Run actual plugin work
 runPlugin();
 
 function runPlugin() {
+    findProxySettings();
     var scannedFiles = scanAllFiles();
     var dependencies = getDependenciesFromFiles(scannedFiles.fileList);
 
     var checkPolicyComplianceRequest = createFullRequest(REQUEST_TYPE.CHECK_POLICY_COMPLIANCE, dependencies);
-    sendRequest(checkPolicyComplianceRequest, function (err, response) {
-            console.log("Error:" + JSON.stringify(err));
-            console.log("Server response:" + JSON.stringify(response));
-    }, function(responseBody) {
+    console.log('Sending check policies request to WhiteSource server');
+    sendRequest(checkPolicyComplianceRequest, onErrorRequest, function(responseBody) {
+        tl.debug('Check policies response: ' + JSON.stringify(responseBody));
         onCheckPolicyComplianceSuccess(responseBody);
         var updateRequest = createFullRequest(REQUEST_TYPE.UPDATE, dependencies);
         sendUpdateRequest(updateRequest)
     });
+}
 
-    // inner function
-    function sendUpdateRequest(updateRequest) {
-        if (foundRejections) {
-            if (forceUpdate === "true") {
-                console.log('Sending data to Whitesource server');
-                tl.debug('Full force update post request as sent to server: ' + JSON.stringify(updateRequest));
+function findProxySettings() {
+    // find the actual proxy url
+    var proxy = tl.getVariable('VSTS_HTTP_PROXY'); // usually undefined but check for backwards compatibility
+    if (!proxy) {
+        proxy = tl.getVariable('AGENT_PROXYURL');
+    }
 
-                sendRequest(updateRequest, function (err, response) {
-                    console.log("Unable to send update request");
-                    console.log("Error:" + JSON.stringify(err));
-                    console.log("Server response:" + JSON.stringify(response));
-                }, function (responseBody) {
-                    console.log("Update request response body: " + JSON.stringify(responseBody));
-                    console.log("Upload process done");
-                    console.log('warning', "Organization was updated even though some dependencies violate organizational policies.");
-                });
-
-            }
-            if (checkPolicies === "FAIL_ON_BUILD") {
-                logError('error', 'Terminating Build');
-                process.exit(1);
-            }
+    if (proxy) {
+        console.log('Proxy settings detected.');
+        // check if there are proxy credentials and construct the proxy url with credentials
+        if (tl.getVariable('AGENT_PROXYUSERNAME') && tl.getVariable('AGENT_PROXYPASSWORD')) {
+            var index = proxy.lastIndexOf('://') + 3; // the actual index of '/'
+            var authenticatedProxy = proxy.substr(0, index) + tl.getVariable('AGENT_PROXYUSERNAME') + ':' +
+                tl.getVariable('AGENT_PROXYPASSWORD') + '@' + proxy.substr(index, proxy.length);
+            httpsProxy = new httpsProxyAgent(authenticatedProxy);
+            console.log('Proxy username and password found. Authenticated proxy url is: ' + authenticatedProxy);
         } else {
-            console.log('Sending data to Whitesource server');
-            sendRequest(updateRequest, function (err, response) {
-                console.log("Unable to send update request");
-                console.log("Error:" + JSON.stringify(err));
-                console.log("Server response:" + JSON.stringify(response));
-            }, function (responseBody) {
-                console.log("Update request response body: " + JSON.stringify(responseBody));
-                console.log("Upload process done");
-            });
+            httpsProxy = new httpsProxyAgent(proxy);
         }
+    } else {
+        tl.debug('No build agent proxy settings found.')
     }
 }
 
 function scanAllFiles() {
-    console.log('Scanning project folder');
-    var readDirObject = readDirRecursive(projectDir); // list the directory files recursively
+    console.log('Start discovering project folder files');
+    var readDirObject = readDirRecursive(Cwd); // list the directory files recursively
     var notPermittedFolders = readDirObject.notPermittedFolders;
 
     if (notPermittedFolders.length !== 0) {
@@ -131,14 +122,14 @@ function getDependenciesFromFiles(files) {
 function createFullRequest(requestType, dependencies) {
     var requestInventory = [{
         "coordinates": {
-            "artifactId": projectName,
+            "artifactId": ProjectName,
             "version": "1.0.0"
         },
         "dependencies": dependencies
     }];
     var body = createPostRequest(requestType) + "&diff=" + JSON.stringify(requestInventory);
 
-    return {
+    var request =  {
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
             'Charset': 'utf-8'
@@ -146,22 +137,28 @@ function createFullRequest(requestType, dependencies) {
         body: body,
         timeout: 3600000,
         method: 'post',
-        url: hostUrl
+        url: DestinationUrl
     };
+
+    if (httpsProxy) {
+        request.agent = httpsProxy;
+    }
+
+    return request;
 }
 
 function createPostRequest(type) {
     return querystring.stringify({
         "agent": "tfs-plugin",
-        "agentVersion": "1.0",
+        "agentVersion": PLUGIN_VERSION,
         "type": type,
-        "token": auth.parameters.apitoken,
+        "token": ServiceAuthorization.parameters.apitoken,
         "timeStamp": new Date().getTime(),
-        "product": product,
-        "productVersion": productVersion,
-        "requesterEmail": requesterEmail,
-        "projectToken": projectToken,
-        "forceCheckAllDependencies": forceCheckAllDependencies
+        "product": Product,
+        "productVersion": ProductVersion,
+        "requesterEmail": RequesterEmail,
+        "projectToken": ProjectToken,
+        "forceCheckAllDependencies": isForceCheckAllDependencies
     });
 }
 
@@ -169,7 +166,7 @@ function sendRequest(fullRequest, onError, onSuccess) {
     tl.debug('Full post request as sent to server: ' + JSON.stringify(fullRequest));
     request(fullRequest, function (err, response, responseBody) {
         if (err && onError) {
-            onError(err, response);
+            onError(err);
         }
         if (response) {
             var statusCode = response.statusCode;
@@ -181,29 +178,28 @@ function sendRequest(fullRequest, onError, onSuccess) {
                 console.log('Build agent is unable to authenticate against the proxy server.' +
                     '\nPlease ask the Team Foundation administrator to add VSTS_HTTP_PROXY_USERNAME and ' +
                     'VSTS_HTTP_PROXY_PASSWORD as build agent environment variables.' +
-                    '\nUnable to proceed with WhiteSource Bolt task.');
+                    '\nUnable to proceed with WhiteSource task.');
                 console.log('##vso[task.complete result=Failed]');
+                process.exit(1);
+            } else if (statusCode === 403 && httpsProxy) {
+                console.log('ERROR: Unable to send requests due to proxy restrictions.\n' +
+                    'Please make sure to add "whitesourcesoftware.com" domain name and it\'s sub domains ' +
+                    'to your proxy whitelist.');
+                console.log('##vso[task.complete result=Failed]');
+                process.exit(1);
+            } else {
+                console.log('Response status code ' + statusCode + '\nUnable to proceed with request');
+                tl.debug('Entire http response is:\n' + JSON.stringify(response));
+                console.log('Unable to proceed with WhiteSource task.');
+                console.log('##vso[task.complete result=Failed]');
+                process.exit(1);
             }
-            // } else if (statusCode === 403 && httpsProxy) {
-            //         console.log('ERROR: Unable to send requests due to proxy restrictions.\n' +
-            //             'Please make sure to add "whitesourcesoftware.com" domain name and it\'s sub domains ' +
-            //             'to your proxy whitelist.');
-            //         console.log('##vso[task.complete result=Failed]');
-            //         process.exit(0);
-            // } else {
-            //         console.log('Response status code ' + statusCode + '\nUnable to proceed with request');
-            //         task.debug('Entire http response is:\n' + JSON.stringify(entireResponse));
-            //         console.log('Unable to proceed with WhiteSource Bolt task.');
-            //         console.log('##vso[task.complete result=Failed]');
-            //         process.exit(0);
-            // }
         }
     });
 }
 
 function onCheckPolicyComplianceSuccess(responseBody) {
     if (isJson(responseBody)) {
-        tl.debug('Server response: ' + JSON.stringify(responseBody));
         if (responseBody.status === 2) { //STATUS_BAD_REQUEST
             logError('error', 'Server responded with status "Bad Request", Please check your credentials');
             logError('error', 'Terminating Build');
@@ -221,25 +217,79 @@ function onCheckPolicyComplianceSuccess(responseBody) {
         process.exit(1);
     }
 
-    if (responseBody.data) {
+    try {
+        var jsonResponse = JSON.parse(responseBody);
+        var responseData =  JSON.parse(jsonResponse.data);
+    } catch (err) {
+        logError('error', 'Unable to parse check policy response data, error: ' + err);
+    }
 
-        // tl.debug('Json parsed response ' + JSON.parse(responseBody.data));
-        tl.debug('Json not parsed response ' + responseBody.data);
-        var rejectionList = getRejectionList(JSON.parse(responseBody.data));
-
-        var rejectionNum = rejectionList.length;
-
-        if (rejectionNum !== 0) {
-            logError('warning', "Found " + rejectionNum + ' policy rejections');
+    if (responseData) {
+        var rejectionList = getRejectionList(responseData);
+        if (rejectionList.length !== 0) {
+            logError('warning', "Found " + rejectionList.length + ' policy rejections');
             rejectionList.forEach(function (rejection) {
-                logError('warning', rejection);
+                logError('warning', 'Resource ' + rejection.resourceName  + ' was rejected by policy "' + rejection.policyName + '"');
             });
+            foundRejections = true;
         }
         else {
             console.log('All dependencies conform with open source policies.');
         }
+    }
+}
 
-        foundRejections = true;
+function sendUpdateRequest(updateRequest) {
+    if (foundRejections) {
+        if (isForceUpdate === "true") {
+            console.log('Sending force update inventory request to WhiteSource server');
+            tl.debug('Full force update post request: ' + JSON.stringify(updateRequest));
+
+            sendRequest(updateRequest, onErrorRequest, function (responseBody) {
+                tl.debug("Force update response: " + JSON.stringify(responseBody));
+                console.log('warning', "Inventory was updated even though some dependencies violate policies.");
+                showUpdateServerResponse(responseBody);
+            });
+        } else {
+            if (CheckPoliciesAction === "FAIL_ON_BUILD") {
+                logError('error', 'Terminating Build upon policy violations');
+                process.exit(1);
+            }
+        }
+    } else {
+        console.log('Sending update inventory request to WhiteSource server');
+        sendRequest(updateRequest, onErrorRequest, function (responseBody) {
+            tl.debug("Update request response: " + JSON.stringify(responseBody));
+            showUpdateServerResponse(responseBody);
+        });
+    }
+}
+
+function onErrorRequest(err) {
+    console.log("Error sending request:" + JSON.stringify(err));
+}
+
+function showUpdateServerResponse(response) {
+    var jsonResponse = JSON.parse(response);
+    var responseData =  JSON.parse(jsonResponse.data);
+
+    if (responseData) {
+        if (responseData.organization) {
+            console.log('Organization ' + responseData.organization + ' was updated');
+        }
+        if (responseData.updatedProjects && responseData.updatedProjects.length > 0) {
+            console.log('Updated projects ' + responseData.updatedProjects.join(','));
+        } else {
+            console.log('No project were updated');
+        }
+        if (responseData.createdProjects && responseData.createdProjects.length > 0) {
+            console.log('Created projects ' + responseData.createdProjects.join(','));
+        } else {
+            console.log('No new project were created');
+        }
+        if (responseData.requestToken) {
+            console.log('Support request token ' + responseData.requestToken);
+        }
     }
 }
 
@@ -249,7 +299,6 @@ function getRejectionList(data) {
     return rejectionList;
 
     // inner functions
-
     function createRejectionList(currentNode) {
         // the node is a leaf
         if (typeof currentNode === 'string') {
@@ -268,8 +317,11 @@ function getRejectionList(data) {
                 var policyIndex = objKeys.indexOf('policy');
                 // There is a rejected policy
                 if (policyIndex !== -1 && currentNode.policy.actionType === 'Reject') {
-                    var file_name = currentNode.resource.displayName;
-                    rejectionList.push(file_name);
+                    var rejectionInfo = {
+                            resourceName: currentNode.resource.displayName,
+                            policyName: currentNode.policy.displayName
+                        };
+                    rejectionList.push(rejectionInfo);
                 } else {
                     // Keep on going
                     objKeys.forEach(function (key) {
@@ -286,7 +338,7 @@ function getRejectionList(data) {
 
 function getDependencyInfo(file, path, modified) {
     var hash = hashFile(path);
-    var dependency = {
+    return {
         "artifactId": file,
         "sha1": hash,
         "otherPlatformSha1": "",
@@ -298,8 +350,6 @@ function getDependencyInfo(file, path, modified) {
         "copyrights": [],
         "lastModified": modified
     };
-
-    return dependency;
 }
 
 function isJson(str) {
@@ -361,7 +411,7 @@ function isFile(path) {
 
 function isExtensionRight(file) {
     var fileExtension = path.extname(file);
-    if (extensionsToHash.indexOf(fileExtension) > -1) {
+    if (IncludedExtensions.indexOf(fileExtension) > -1) {
         return true;
     }
 }
@@ -382,7 +432,3 @@ function getLastModifiedDate(path) {
 function logError(type, str) {
     console.log('##vso[task.logissue type=' + type + ']' + str);
 }
-
-// +------------+
-// | Sync POST |
-// +------------+
