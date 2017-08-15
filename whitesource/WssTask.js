@@ -1,14 +1,19 @@
 // Import libraries
 var fs = require('fs'),
     path = require('path'),
-    http = require('http'),
     crypto = require('crypto'),
     moment = require('moment'),
     querystring = require('querystring'),
-    syncRequest = require('sync-request'),
     tl = require('vsts-task-lib/task'),
     fileMatch = require('file-match'),
-    values = require('object.values');
+    request = require('request');
+
+const REQUEST_TYPE = {
+        CHECK_POLICY_COMPLIANCE: 'CHECK_POLICY_COMPLIANCE',
+        UPDATE: 'UPDATE'
+};
+
+var foundRejections = false;
 
 var service = tl.getInput('WhiteSourceService', false);
 const hostUrl = tl.getEndpointUrl(service, false);
@@ -35,182 +40,115 @@ var forceCheckAllDependencies = tl.getInput('forceCheckAllDependencies', false);
 var forceUpdate = tl.getInput('forceUpdate', false);
 
 
-// Create the "diff" JSON attribute
-var diff = [{
-    "coordinates": {
-        "artifactId": projectName,
-        "version": "1.0.0"
-    },
-    "dependencies": []
-}];
+runPlugin();
 
-//List the directory files recursively
-console.log('Scanning project folder');
-var readDirObject = readDirRecursive(projectDir);
-var directoryList = readDirObject.fileList;
-var notPermittedFolders = readDirObject.notPermittedFolders;
+function runPlugin() {
+    var scannedFiles = scanAllFiles();
+    var dependencies = getDependenciesFromFiles(scannedFiles.fileList);
 
-if (notPermittedFolders.length !== 0) {
-    console.log('Skipping the following folders due to insufficient permissions:');
-    console.log('---------------------------------------------------------------');
-    notPermittedFolders.forEach(function (folder) {
-        console.log(folder);
+    var checkPolicyComplianceRequest = createFullRequest(REQUEST_TYPE.CHECK_POLICY_COMPLIANCE, dependencies);
+    sendRequest(checkPolicyComplianceRequest, function (err, response) {
+            console.log("Error:" + JSON.stringify(err));
+            console.log("Server response:" + JSON.stringify(response));
+    }, function(responseBody) {
+        onCheckPolicyComplianceSuccess(responseBody);
+        var updateRequest = createFullRequest(REQUEST_TYPE.UPDATE, dependencies);
+        sendUpdateRequest(updateRequest)
     });
-    console.log('---------------------------------------------------------------');
-}
 
-//Update the diff object
-directoryList.forEach(function (file) {
-    var fullPath = file.path + path.sep + file.name;
-    if (isFile(fullPath) && isExtensionRight(file.name)) {
-        var lastModified = getLastModifiedDate(fullPath);
-        addToDependencies(file.name, fullPath, lastModified);
-    }
-});
+    // inner function
+    function sendUpdateRequest(updateRequest) {
+        if (foundRejections) {
+            if (forceUpdate === "true") {
+                console.log('Sending data to Whitesource server');
+                tl.debug('Full force update post request as sent to server: ' + JSON.stringify(updateRequest));
 
+                sendRequest(updateRequest, function (err, response) {
+                    console.log("Unable to send update request");
+                    console.log("Error:" + JSON.stringify(err));
+                    console.log("Server response:" + JSON.stringify(response));
+                }, function (responseBody) {
+                    console.log("Update request response body: " + JSON.stringify(responseBody));
+                    console.log("Upload process done");
+                    console.log('warning', "Organization was updated even though some dependencies violate organizational policies.");
+                });
 
-// +------------+
-// | Sync POST |
-// +------------+
-console.log('Sending data to Whitesource server');
-
-var fullRequest = {
-    headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Charset': 'utf-8'
-    },
-    body: createPostRequest("CHECK_POLICY_COMPLIANCE") + "&diff=" + JSON.stringify(diff),
-    timeout: 3600000
-};
-tl.debug('Full post request as sent to server: ' + JSON.stringify(fullRequest));
-
-var syncRes = syncRequest('POST', hostUrl, fullRequest);
-
-var totalFiles = JSON.stringify(diff[0].dependencies.length);
-console.log('Total files found: ' + totalFiles);
-
-console.log('Checking for policy rejections');
-var responseBody = syncRes.getBody('utf8');
-if (isJson(responseBody)) {
-    tl.debug('Server response: ' + JSON.stringify(responseBody));
-    //noinspection JSUnresolvedFunction
-    var parsedRes = JSON.parse(syncRes.getBody('utf8'));
-    if (parsedRes.status === 2) { //STATUS_BAD_REQUEST
-        logError(error, 'Server responded with status "Bad Request", Please check your credentials');
-        logError(error, 'Terminating Build');
-        process.exit(1);
-    }
-    else if (parsedRes.status === 3) { //STATUS_SERVER_ERROR
-        logError(error, 'Server responded with status "Server Error", please try again');
-        logError(error, 'Terminating Build');
-        process.exit(1);
-    }
-
-}
-else {
-    logError(error, 'Server responded with object other than "JSON"');
-    logError(error, responseBody);
-    logError(error, 'Terminating Build');
-    process.exit(1);
-}
-
-var rejectionList = [];
-
-var createRejectionList = function (currentNode) {
-    // the node is a leaf
-    if (typeof currentNode === 'string') {
-        return;
-    }
-    // the node is children array
-    else if (Array.isArray(currentNode) && currentNode.length !== 0) {
-        currentNode.forEach(function (child) {
-            createRejectionList(child);
-        })
-    } else {
-        // The node if object or empty array
-        var objKeys = Object.keys(currentNode);
-        if (objKeys.length !== 0) {
-            // The node is non empty object
-            var policyIndex = objKeys.indexOf('policy');
-            // There is a rejected policy
-            if (policyIndex !== -1 && currentNode.policy.actionType === 'Reject') {
-                var file_name = currentNode.resource.displayName;
-                rejectionList.push(file_name);
-            } else {
-                // Keep on going
-                objKeys.forEach(function (key) {
-                    createRejectionList(currentNode[key]);
-                })
+            }
+            if (checkPolicies === "FAIL_ON_BUILD") {
+                logError('error', 'Terminating Build');
+                process.exit(1);
             }
         } else {
-            // Empty object or array
-            return;
+            console.log('Sending data to Whitesource server');
+            sendRequest(updateRequest, function (err, response) {
+                console.log("Unable to send update request");
+                console.log("Error:" + JSON.stringify(err));
+                console.log("Server response:" + JSON.stringify(response));
+            }, function (responseBody) {
+                console.log("Update request response body: " + JSON.stringify(responseBody));
+                console.log("Upload process done");
+            });
         }
     }
-};
+}
 
-var resData = JSON.parse(parsedRes.data);
-createRejectionList(resData);
-var rejectionNum = rejectionList.length;
+function scanAllFiles() {
+    console.log('Scanning project folder');
+    var readDirObject = readDirRecursive(projectDir); // list the directory files recursively
+    var notPermittedFolders = readDirObject.notPermittedFolders;
 
+    if (notPermittedFolders.length !== 0) {
+        console.log('Skipping the following folders due to insufficient permissions:');
+        console.log('---------------------------------------------------------------');
+        notPermittedFolders.forEach(function (folder) {
+            console.log(folder);
+        });
+        console.log('---------------------------------------------------------------');
+    }
+    tl.debug('Scan files result: ' + JSON.stringify(readDirObject));
+    console.log('Finished discovering all files');
+    return readDirObject;
+}
 
-// +--------------------+
-// | Result From Server |
-// +--------------------+
+function getDependenciesFromFiles(files) {
+    var dependencies = [];
 
-
-if (rejectionNum !== 0) {
-    logError('warning', "Found " + rejectionNum + ' policy rejections');
-    rejectionList.forEach(function (rejection) {
-        logError('warning', rejection);
+    files.forEach(function (file) {
+        var fullPath = file.path + path.sep + file.name;
+        if (isFile(fullPath) && isExtensionRight(file.name)) {
+            var lastModified = getLastModifiedDate(fullPath);
+            var dependency = getDependencyInfo(file.name, fullPath, lastModified);
+            if (dependency) {
+                dependencies.push(dependency);
+            }
+        }
     });
-}
-else {
-    console.log('All dependencies conform with open source policies.');
+    console.log('Suspected dependencies found: ' + dependencies.length);
+    tl.debug('All suspected dependency infos: ' + JSON.stringify(dependencies));
+    return dependencies;
 }
 
-// SECOND POST
-// +------------+
-// | Sync POST |
-// +------------+
-if (rejectionNum !== 0) {
-    if (forceUpdate === "true") {
-        console.log('Sending data to Whitesource server');
-        var forceUpdateRequest = {
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Charset': 'utf-8'
-            },
-            body: createPostRequest("UPDATE") + "&diff=" + JSON.stringify(diff),
-            timeout: 3600000
-        };
-        tl.debug('Full force update post request as sent to server: ' + JSON.stringify(forceUpdateRequest));
-        syncRequest('POST', hostUrl, forceUpdateRequest);
-        console.log("Upload process done");
-        console.log('warning', "Organization was updated even though some dependencies violate organizational policies.");
-    }
-    if (checkPolicies === "FAIL_ON_BUILD") {
-        logError('error', 'Terminating Build');
-        process.exit(1);
-    }
-} else {
-    console.log('Sending data to Whitesource server');
-    var updateRequest = {
+function createFullRequest(requestType, dependencies) {
+    var requestInventory = [{
+        "coordinates": {
+            "artifactId": projectName,
+            "version": "1.0.0"
+        },
+        "dependencies": dependencies
+    }];
+    var body = createPostRequest(requestType) + "&diff=" + JSON.stringify(requestInventory);
+
+    return {
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
             'Charset': 'utf-8'
         },
-        body: createPostRequest("UPDATE") + "&diff=" + JSON.stringify(diff),
-        timeout: 3600000
+        body: body,
+        timeout: 3600000,
+        method: 'post',
+        url: hostUrl
     };
-    tl.debug('Full update post request without rejection as sent to server: ' + JSON.stringify(updateRequest));
-    syncRequest('POST', hostUrl, updateRequest);
-    console.log("Upload process done");
 }
-
-// +------------------+
-// | Define functions |
-// +------------------+
 
 function createPostRequest(type) {
     return querystring.stringify({
@@ -227,28 +165,152 @@ function createPostRequest(type) {
     });
 }
 
-function creatResultOutput(responseData) {
-    var wssResult = __dirname + path.sep + 'realResult.md';
-    console.log(responseData);
-    var totalProjects = responseData.projects;
-    console.log(totalProjects);
-//WRITING RESULT FILE
-    if (totalProjects[0] !== null) {
-        var projectName = totalProjects[0].name;
-        var projectUrl = totalProjects[0].url;
-        var projectNew = totalProjects[0].newlyCreated;
-        var projectAlerts = totalProjects[0].totalAlerts;
-        var projectVulnerable = totalProjects[0].totalVulnerableLibraries;
-        var projectPolicy = totalProjects[0].totalPolicyViolations;
-        // ToDo: maybe add server time instead of client time
-        var projectDate = moment(totalProjects[0].date, 'MMM D, YYYY h:mm:ss A').format('dddd, MMMM D, YYYY h:mm A');
-    }
-    var mdFile = '<div style="padding:5px 0px"> <span>Vulnerabilities Summary:</span> </div> <table border="0" style="border-top: 1px solid #eee;border-collapse: separate;border-spacing: 0 2px;"> <table> <tr> <td>Project name</td> <td></td> <td>' + projectName + '</td> </tr> <tr> <td>Project url:</td> <td></td> <td>' + projectUrl + '</td> </tr> <tr> <td>Project new</td> <td></td> <td>' + projectNew + '</td> </tr> <tr> <td>Project totalAlerts</td> <td></td> <td>' + projectAlerts + '</td> </tr> <tr> <td>Project totalVulnerableLibraries</td> <td></td> <td>' + projectVulnerable + '</td> </tr> <tr> <td>Project totalPolicyViolations</td> <td></td> <td>' + projectPolicy + '</td> </tr> <tr> <td>Project date</td> <td></td> <td>' + projectDate + '</td> </tr> </table> <a target="_blank" href="https://saas.whitesourcesoftware.com/Wss/WSS.html">For more Information</a> </div>';
-    fs.writeFile(wssResult, mdFile, function (err) {
-        if (err)
-            return console.log(err);
+function sendRequest(fullRequest, onError, onSuccess) {
+    tl.debug('Full post request as sent to server: ' + JSON.stringify(fullRequest));
+    request(fullRequest, function (err, response, responseBody) {
+        if (err && onError) {
+            onError(err, response);
+        }
+        if (response) {
+            var statusCode = response.statusCode;
+            if ((statusCode >= 200 && statusCode < 300) || statusCode === 304) {
+                if (onSuccess) {
+                    onSuccess(responseBody);
+                }
+            } else if (statusCode === 407) {
+                console.log('Build agent is unable to authenticate against the proxy server.' +
+                    '\nPlease ask the Team Foundation administrator to add VSTS_HTTP_PROXY_USERNAME and ' +
+                    'VSTS_HTTP_PROXY_PASSWORD as build agent environment variables.' +
+                    '\nUnable to proceed with WhiteSource Bolt task.');
+                console.log('##vso[task.complete result=Failed]');
+            }
+            // } else if (statusCode === 403 && httpsProxy) {
+            //         console.log('ERROR: Unable to send requests due to proxy restrictions.\n' +
+            //             'Please make sure to add "whitesourcesoftware.com" domain name and it\'s sub domains ' +
+            //             'to your proxy whitelist.');
+            //         console.log('##vso[task.complete result=Failed]');
+            //         process.exit(0);
+            // } else {
+            //         console.log('Response status code ' + statusCode + '\nUnable to proceed with request');
+            //         task.debug('Entire http response is:\n' + JSON.stringify(entireResponse));
+            //         console.log('Unable to proceed with WhiteSource Bolt task.');
+            //         console.log('##vso[task.complete result=Failed]');
+            //         process.exit(0);
+            // }
+        }
     });
-    console.log("##vso[task.addattachment type=Distributedtask.Core.Summary;name=Wss Report;]" + wssResult);
+}
+
+function onCheckPolicyComplianceSuccess(responseBody) {
+    if (isJson(responseBody)) {
+        tl.debug('Server response: ' + JSON.stringify(responseBody));
+        if (responseBody.status === 2) { //STATUS_BAD_REQUEST
+            logError('error', 'Server responded with status "Bad Request", Please check your credentials');
+            logError('error', 'Terminating Build');
+            process.exit(1);
+        }
+        else if (responseBody.status === 3) { //STATUS_SERVER_ERROR
+            logError('error', 'Server responded with status "Server Error", please try again');
+            logError('error', 'Terminating Build');
+            process.exit(1);
+        }
+    } else {
+        logError('error', 'Server responded with object other than "JSON"');
+        logError('error', responseBody);
+        logError('error', 'Terminating Build');
+        process.exit(1);
+    }
+
+    if (responseBody.data) {
+
+        // tl.debug('Json parsed response ' + JSON.parse(responseBody.data));
+        tl.debug('Json not parsed response ' + responseBody.data);
+        var rejectionList = getRejectionList(JSON.parse(responseBody.data));
+
+        var rejectionNum = rejectionList.length;
+
+        if (rejectionNum !== 0) {
+            logError('warning', "Found " + rejectionNum + ' policy rejections');
+            rejectionList.forEach(function (rejection) {
+                logError('warning', rejection);
+            });
+        }
+        else {
+            console.log('All dependencies conform with open source policies.');
+        }
+
+        foundRejections = true;
+    }
+}
+
+function getRejectionList(data) {
+    var rejectionList = [];
+    createRejectionList(data);
+    return rejectionList;
+
+    // inner functions
+
+    function createRejectionList(currentNode) {
+        // the node is a leaf
+        if (typeof currentNode === 'string') {
+            return;
+        }
+        // the node is children array
+        else if (Array.isArray(currentNode) && currentNode.length !== 0) {
+            currentNode.forEach(function (child) {
+                createRejectionList(child);
+            })
+        } else {
+            // The node if object or empty array
+            var objKeys = Object.keys(currentNode);
+            if (objKeys.length !== 0) {
+                // The node is non empty object
+                var policyIndex = objKeys.indexOf('policy');
+                // There is a rejected policy
+                if (policyIndex !== -1 && currentNode.policy.actionType === 'Reject') {
+                    var file_name = currentNode.resource.displayName;
+                    rejectionList.push(file_name);
+                } else {
+                    // Keep on going
+                    objKeys.forEach(function (key) {
+                        createRejectionList(currentNode[key]);
+                    })
+                }
+            } else {
+                // Empty object or array
+                return;
+            }
+        }
+    }
+}
+
+function getDependencyInfo(file, path, modified) {
+    var hash = hashFile(path);
+    var dependency = {
+        "artifactId": file,
+        "sha1": hash,
+        "otherPlatformSha1": "",
+        "systemPath": path,
+        "optional": false,
+        "children": [],
+        "exclusions": [],
+        "licenses": [],
+        "copyrights": [],
+        "lastModified": modified
+    };
+
+    return dependency;
+}
+
+function isJson(str) {
+    try {
+        JSON.parse(str);
+    }
+    catch (err) {
+        logError('error', err);
+        return false;
+    }
+    return true;
 }
 
 function readDirRecursive(dir, fileList) {
@@ -317,48 +379,10 @@ function getLastModifiedDate(path) {
     return moment(stats.mtime).format("MMM D, YYYY h:mm:ss A")
 }
 
-function addToDependencies(file, path, modified) {
-    var hash = hashFile(path);
-    var dependency = {
-        "artifactId": file,
-        "sha1": hash,
-        "otherPlatformSha1": "",
-        "systemPath": path,
-        "optional": false,
-        "children": [],
-        "exclusions": [],
-        "licenses": [],
-        "copyrights": [],
-        "lastModified": modified
-    };
-    diff[0].dependencies.push(dependency);
-}
-
-function isJson(str) {
-    try {
-        JSON.parse(str);
-    }
-    catch (err) {
-        logError('error', err);
-        return false;
-    }
-    return true;
-}
-
 function logError(type, str) {
     console.log('##vso[task.logissue type=' + type + ']' + str);
 }
 
-function printInfo() {
-    console.log("This is from Agent: \n" + JSON.stringify(resData, null, 2) + "\n");
-    console.log("Inside Json: " + JSON.stringify(resData.projectNewResources, null, 2) + "\n");
-    var myArray = values(resData.projectNewResources)[0];
-    for (var i = 0; i < myArray.length; i++) {
-        console.log("for -> displayName: " + myArray[i].displayName + "\n");
-        console.log("for -> link: " + myArray[i].link + "\n");
-        console.log("for -> licenses: " + myArray[i].licenses + "\n");
-        console.log("for -> sha1: " + myArray[i].sha1 + "\n");
-        console.log("for -> vulnerabilities: " + myArray[i].vulnerabilities + "\n");
-    }
-
-}
+// +------------+
+// | Sync POST |
+// +------------+
