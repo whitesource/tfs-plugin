@@ -271,7 +271,13 @@ function onErrorRequest(err) {
 
 function showUpdateServerResponse(response) {
     var jsonResponse = JSON.parse(response);
-    var responseData =  JSON.parse(jsonResponse.data);
+    var responseData;
+    try {
+        responseData = JSON.parse(jsonResponse.data);
+    } catch (err){
+        console.log("Error in updating WhiteSource: " + jsonResponse.data);
+        process.exit(1);
+    }
 
     if (responseData) {
         if (responseData.organization) {
