@@ -16,6 +16,7 @@
     "file-match": "^1.0.2 ",
     "object.values": "^1.0.4",
     "request": "2.81.0",
-    "https-proxy-agent" : "1.0.0"
+    "https-proxy-agent": "1.0.0",
+    "convert-string": "^0.1.0"
   }
 }

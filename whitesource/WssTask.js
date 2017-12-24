@@ -8,6 +8,8 @@ var fs = require('fs'),
     fileMatch = require('file-match'),
     request = require('request'),
     httpsProxyAgent = require('https-proxy-agent');
+var HashCalculator = require('./HashCalculator');
+var constants = require('./constants');
 
 // Plugin configuration params
 
@@ -342,11 +344,23 @@ function getRejectionList(data) {
     }
 }
 
-function getDependencyInfo(file, path, modified) {
-    var hash = hashFile(path);
+function getDependencyInfo(fileName, path, modified) {
+    if(fileName.toLowerCase().match(constants.JS_SCRIPT_REGEX)) {
+
+    }
+    var sha1AndOtherPlatformSha1 = HashCalculator.getSha1(path);
+    var hashCalculationResult = HashCalculator.calculateSuperHash(path, fileName);
+    tl.debug("Complete calculating Sha1 of " + path + " sha1: " + sha1AndOtherPlatformSha1.sha1 + " Other Platform Sha1: " + sha1AndOtherPlatformSha1.otherPlatformSha1);
+    if (hashCalculationResult != null) {
+        tl.debug("fullFileHash: " + hashCalculationResult.fullHash + ", mostSigBitsHash: " + hashCalculationResult.mostSigBitsHash + ", leastSigBitsHash: " + hashCalculationResult.leastSigBitsHash);
+    }
     return {
-        "artifactId": file,
-        "sha1": hash,
+        "artifactId": fileName,
+        "sha1": sha1AndOtherPlatformSha1.sha1,
+        "otherPlatformSha1": sha1AndOtherPlatformSha1.otherPlatformSha1,
+        "fullHash": (hashCalculationResult == null) ? null : hashCalculationResult.fullHash,
+        "mostSigBitsHash": (hashCalculationResult == null) ? null : hashCalculationResult.mostSigBitsHash,
+        "leastSigBitsHash": (hashCalculationResult == null) ? null : hashCalculationResult.leastSigBitsHash,
         "otherPlatformSha1": "",
         "systemPath": path,
         "optional": false,
@@ -420,14 +434,6 @@ function isExtensionRight(file) {
     if (IncludedExtensions.indexOf(fileExtension) > -1) {
         return true;
     }
-}
-
-function hashFile(path) {
-    //Gets file name and return it SHA1 hashed
-    var fileData = fs.readFileSync(path);
-    var shasum = crypto.createHash('sha1');
-    shasum.update(fileData);
-    return shasum.digest('hex');
 }
 
 function getLastModifiedDate(path) {
