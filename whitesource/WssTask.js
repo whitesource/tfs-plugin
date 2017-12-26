@@ -33,7 +33,7 @@ const isForceCheckAllDependencies = tl.getInput('forceCheckAllDependencies', fal
 const isForceUpdate = tl.getInput('forceUpdate', false);
 
 // General global variables
-const PLUGIN_VERSION = '0.1.9';
+const PLUGIN_VERSION = '17.12.3';
 const REQUEST_TYPE = {
     CHECK_POLICY_COMPLIANCE: 'CHECK_POLICY_COMPLIANCE',
     UPDATE: 'UPDATE'
