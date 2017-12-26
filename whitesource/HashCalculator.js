@@ -42,7 +42,6 @@ function checkIfFileIsBinary(fileName) {
     if (BINARY_FILE_EXTENSION_REGEX == null) {
         BINARY_FILE_EXTENSION_REGEX = FileExtensions.buildBinaryRegex();
     }
-    tl.debug(BINARY_FILE_EXTENSION_REGEX);
     return fileName.toLowerCase().match(BINARY_FILE_EXTENSION_REGEX);
 }
 
@@ -103,9 +102,9 @@ function getSha1(path) {
     var otherPlatformSha1 = null;
     if (getFileSizeInBytes(path) < constants.MAX_FILE_SIZE) {
         var fileDataString = fileData.toString();
-        if (fileDataString.indexOf(constants.CRLF)) {
+        if (fileDataString.indexOf(constants.CRLF) >= 0) {
             otherPlatformSha1 = getSha1FromData(fileDataString.replace(new RegExp(constants.CRLF, 'g'), constants.NOT_CRLF));
-        } else if (fileDataString.indexOf(constants.NOT_CRLF)) {
+        } else if (fileDataString.indexOf(constants.NOT_CRLF) >= 0) {
             otherPlatformSha1 = getSha1FromData(fileDataString.replace(new RegExp(constants.NOT_CRLF, 'g'), constants.CRLF));
         }
     }
@@ -122,14 +121,4 @@ function getSha1FromData(bufferData) {
 function getFileSizeInBytes(filePath) {
     var stats = fs.statSync(filePath);
     return stats["size"];
-}
-
-function calculateJavaScriptHashes(filePath) {
-    //TODO Add try & catch
-    var fileData = fs.readFileSync(filePath, {encoding: constants.UTF_8});
-    return getJavaScriptHashes(converter.UTF8.stringToBytes(fileData));
-}
-
-function getJavaScriptHashes(arrayOfBytes) {
-
 }

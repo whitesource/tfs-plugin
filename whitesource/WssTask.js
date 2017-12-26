@@ -361,7 +361,6 @@ function getDependencyInfo(fileName, path, modified) {
         "fullHash": (hashCalculationResult == null) ? null : hashCalculationResult.fullHash,
         "mostSigBitsHash": (hashCalculationResult == null) ? null : hashCalculationResult.mostSigBitsHash,
         "leastSigBitsHash": (hashCalculationResult == null) ? null : hashCalculationResult.leastSigBitsHash,
-        "otherPlatformSha1": "",
         "systemPath": path,
         "optional": false,
         "children": [],
