@@ -8,6 +8,7 @@ var crypto = require('crypto');
 var converter = require('convert-string');
 var constants = require('./constants');
 var FileExtensions = require('./FileExtensions');
+//var strip = require('strip-comments');
 
 var BINARY_FILE_EXTENSION_REGEX = null;
 
@@ -16,6 +17,19 @@ function HashCalculationResult(fullHash, mostSigBitsHash, leastSigBitsHash) {
     this.mostSigBitsHash = mostSigBitsHash;
     this.leastSigBitsHash = leastSigBitsHash;
 }
+
+/*
+function calculateJavaScriptHashes(filePath, fileName) {
+    try {
+        var fileData = fs.readFileSync(filePath, {encoding: constants.UTF_8});
+        var dataWithoutComments = strip(fileData);
+        var arrayOfBytesOfData = converter.UTF8.stringToBytes(dataWithoutComments);
+        var dataWithoutCommentsAndSpacesAndSemicolon = stripWhiteSpaces(arrayOfBytesOfData, true);
+    } catch (e) {
+        tl.debug("Error calculating JavaScript hash for " + fileName);
+    }
+}*/
+
 
 function calculateSuperHash(filePath, fileName) {
     if (!checkIfFileIsBinary(fileName)) {
@@ -49,7 +63,7 @@ exports.calculateSuperHash = calculateSuperHash;
 
 function getSuperHash(arrayOfBytes) {
     var result = null;
-    var bytesWithoutSpaces = stripWhiteSpaces(arrayOfBytes);
+    var bytesWithoutSpaces = stripWhiteSpaces(arrayOfBytes, false);
     var fileSizeWithoutSpaces = bytesWithoutSpaces.length;
     if (fileSizeWithoutSpaces < constants.FILE_MIN_SIZE_THRESHOLD) {
         tl.debug("Ignored file " + file.getName() + " (" + fileSizeWithoutSpaces + "B): minimum file size is 512B");
@@ -85,10 +99,14 @@ function hashBuckets(fileWithoutSpaces, bucketSize) {
     return new HashCalculationResult(fullFileHash, mostSigBitsHash, leastSigBitsHash);
 }
 
-function stripWhiteSpaces(bytesArray) {
+function stripWhiteSpaces(bytesArray, withSemicolon) {
     var arrayWithoutSpaces = new Array();
+    var excludes = constants.WHITESPACE;
+    if(withSemicolon) {
+        excludes.push(constants.SEMICOLON);
+    }
     for (var byte in bytesArray) {
-        if (constants.WHITESPACE.indexOf(bytesArray[byte]) < 0) {
+        if (excludes.indexOf(bytesArray[byte]) < 0) {
             arrayWithoutSpaces.push(bytesArray[byte]);
         }
     }

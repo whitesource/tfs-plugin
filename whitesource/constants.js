@@ -11,6 +11,7 @@ module.exports = Object.freeze({
     NEW_LINE: 10,
     HORIZONTAL_TAB: 9,
     SPACE: 32,
+    SEMICOLON: 59,
     WHITESPACE: [13, 10, 9, 32],
     UTF_8: "utf8",
     JS_SCRIPT_REGEX: /.*\.js/,

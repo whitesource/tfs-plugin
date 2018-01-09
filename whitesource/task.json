@@ -10,9 +10,9 @@
   ],
   "author": "WhiteSource",
   "version": {
-    "Major": 17,
-    "Minor": 12,
-    "Patch": 3
+    "Major": 18,
+    "Minor": 1,
+    "Patch": 1
   },
   "demands": [
     "node.js"
@@ -53,7 +53,7 @@
       "label": "Check policies",
       "defaultValue": "SEND_ALERTS",
       "required": true,
-      "helpMarkDown": "",
+      "helpMarkDown": "Select whether to evaluate the policy conditions. Will allow to fail the build in case of policy failure",
       "options": {
         "SEND_ALERTS": "Send alerts",
         "FAIL_ON_BUILD": "Fail on build"
@@ -105,7 +105,7 @@
       "label": "Force check all dependencies",
       "defaultValue": false,
       "required": false,
-      "helpMarkDown": " Policies will be checked only for new dependencies introduced to the WhiteSource projects. Only works when CHECK_POLICY_COMPLIANCE"
+      "helpMarkDown": " Policies will be checked only for new dependencies introduced to the WhiteSource projects. Used only if Check Policies is enabled."
     },
     {
       "name": "forceUpdate",
