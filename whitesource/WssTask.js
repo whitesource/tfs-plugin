@@ -31,9 +31,12 @@ const RequesterEmail = tl.getInput('requesterEmail', false);
 const ProjectToken = tl.getInput('projectToken', false);
 const isForceCheckAllDependencies = tl.getInput('forceCheckAllDependencies', false);
 const isForceUpdate = tl.getInput('forceUpdate', false);
+var proxy = tl.getInput('proxyUrl', false);
+const proxyUsername = tl.getInput('proxyUsername', false);
+const proxyPassword = tl.getInput('proxyPassword', false);
 
 // General global variables
-const PLUGIN_VERSION = '18.1.1';
+const PLUGIN_VERSION = '18.1.3';
 const REQUEST_TYPE = {
     CHECK_POLICY_COMPLIANCE: 'CHECK_POLICY_COMPLIANCE',
     UPDATE: 'UPDATE'
@@ -63,7 +66,9 @@ function runPlugin() {
 
 function findProxySettings() {
     // find the actual proxy url
-    var proxy = tl.getVariable('VSTS_HTTP_PROXY'); // usually undefined but check for backwards compatibility
+    if(!proxy) {
+        proxy = tl.getVariable('VSTS_HTTP_PROXY'); // usually undefined but check for backwards compatibility
+    }
     if (!proxy) {
         proxy = tl.getVariable('AGENT_PROXYURL');
     }
@@ -71,18 +76,24 @@ function findProxySettings() {
     if (proxy) {
         console.log('Proxy settings detected.');
         // check if there are proxy credentials and construct the proxy url with credentials
-        if (tl.getVariable('AGENT_PROXYUSERNAME') && tl.getVariable('AGENT_PROXYPASSWORD')) {
-            var index = proxy.lastIndexOf('://') + 3; // the actual index of '/'
-            var authenticatedProxy = proxy.substr(0, index) + tl.getVariable('AGENT_PROXYUSERNAME') + ':' +
-                tl.getVariable('AGENT_PROXYPASSWORD') + '@' + proxy.substr(index, proxy.length);
-            httpsProxy = new httpsProxyAgent(authenticatedProxy);
-            console.log('Proxy username and password found. Authenticated proxy url is: ' + authenticatedProxy);
+        if (proxyUsername && proxyPassword) {
+            httpsProxy = getAuthenticatedProxy(proxyUsername, proxyPassword);
+        } else if (tl.getVariable('VSTS_HTTP_PROXY_USERNAME') && tl.getVariable('VSTS_HTTP_PROXY_PASSWORD')) {
+            httpsProxy = getAuthenticatedProxy(tl.getVariable('VSTS_HTTP_PROXY_USERNAME'), tl.getVariable('VSTS_HTTP_PROXY_PASSWORD'));
         } else {
             httpsProxy = new httpsProxyAgent(proxy);
         }
     } else {
         tl.debug('No build agent proxy settings found.')
     }
+}
+
+function getAuthenticatedProxy(proxyUsername, proxyPassword) {
+    var index = proxy.lastIndexOf('://') + 3; // the actual index of '/'
+    var authenticatedProxy = proxy.substr(0, index) + proxyUsername + ':' +
+        proxyPassword + '@' + proxy.substr(index, proxy.length);
+    console.log('Proxy username and password found. Authenticated proxy url is: ' + authenticatedProxy);
+    return new httpsProxyAgent(authenticatedProxy);
 }
 
 function scanAllFiles() {
