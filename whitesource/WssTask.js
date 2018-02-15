@@ -92,7 +92,7 @@ function getAuthenticatedProxy(proxyUsername, proxyPassword) {
     var index = proxy.lastIndexOf('://') + 3; // the actual index of '/'
     var authenticatedProxy = proxy.substr(0, index) + proxyUsername + ':' +
         proxyPassword + '@' + proxy.substr(index, proxy.length);
-    console.log('Proxy username and password found. Authenticated proxy url is: ' + authenticatedProxy);
+    console.log('Proxy username and password found.');
     return new httpsProxyAgent(authenticatedProxy);
 }
 
