@@ -10,6 +10,7 @@ var fs = require('fs'),
     httpsProxyAgent = require('https-proxy-agent');
 var HashCalculator = require('./HashCalculator');
 var constants = require('./constants');
+var connectionTimeout = 3600000;
 
 // Plugin configuration params
 
@@ -34,6 +35,8 @@ const isForceUpdate = tl.getInput('forceUpdate', false);
 var proxy = tl.getInput('proxyUrl', false);
 const proxyUsername = tl.getInput('proxyUsername', false);
 const proxyPassword = tl.getInput('proxyPassword', false);
+const connectionTimeoutField = tl.getInput('connectionTimeoutField', false);
+
 
 // General global variables
 const PLUGIN_VERSION = '18.1.3';
@@ -56,7 +59,7 @@ function runPlugin() {
 
     var checkPolicyComplianceRequest = createFullRequest(REQUEST_TYPE.CHECK_POLICY_COMPLIANCE, dependencies);
     console.log('Sending check policies request to WhiteSource server');
-    sendRequest(checkPolicyComplianceRequest, onErrorRequest, function(responseBody) {
+    sendRequest(checkPolicyComplianceRequest, onErrorRequest, function (responseBody) {
         tl.debug('Check policies response: ' + JSON.stringify(responseBody));
         onCheckPolicyComplianceSuccess(responseBody);
         var updateRequest = createFullRequest(REQUEST_TYPE.UPDATE, dependencies);
@@ -66,7 +69,7 @@ function runPlugin() {
 
 function findProxySettings() {
     // find the actual proxy url
-    if(!proxy) {
+    if (!proxy) {
         proxy = tl.getVariable('VSTS_HTTP_PROXY'); // usually undefined but check for backwards compatibility
     }
     if (!proxy) {
@@ -140,15 +143,19 @@ function createFullRequest(requestType, dependencies) {
         },
         "dependencies": dependencies
     }];
+    if (connectionTimeoutField != null) {
+        connectionTimeout = connectionTimeoutField * 60 * 1000;
+    }
+
     var body = createPostRequest(requestType) + "&diff=" + JSON.stringify(requestInventory);
 
-    var request =  {
+    var request = {
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
             'Charset': 'utf-8'
         },
         body: body,
-        timeout: 3600000,
+        timeout: connectionTimeout,
         method: 'post',
         url: DestinationUrl
     };
@@ -232,7 +239,8 @@ function onCheckPolicyComplianceSuccess(responseBody) {
 
     try {
         var jsonResponse = JSON.parse(responseBody);
-        var responseData =  JSON.parse(jsonResponse.data);
+
+        var responseData = JSON.parse(jsonResponse.data);
     } catch (err) {
         logError('error', 'Unable to parse check policy response data, error: ' + err);
     }
@@ -242,7 +250,7 @@ function onCheckPolicyComplianceSuccess(responseBody) {
         if (rejectionList.length !== 0) {
             logError('warning', "Found " + rejectionList.length + ' policy rejections');
             rejectionList.forEach(function (rejection) {
-                logError('warning', 'Resource ' + rejection.resourceName  + ' was rejected by policy "' + rejection.policyName + '"');
+                logError('warning', 'Resource ' + rejection.resourceName + ' was rejected by policy "' + rejection.policyName + '"');
             });
             foundRejections = true;
         }
@@ -280,6 +288,10 @@ function sendUpdateRequest(updateRequest) {
 
 function onErrorRequest(err) {
     console.log("Error sending request:" + JSON.stringify(err));
+    if(err.code = "ESOCKETTIMEDOUT"){
+        console.log("Please consider to update the 'Connection timeout' under your WhiteSource task settings");
+    }
+
 }
 
 function showUpdateServerResponse(response) {
@@ -287,7 +299,7 @@ function showUpdateServerResponse(response) {
     var responseData;
     try {
         responseData = JSON.parse(jsonResponse.data);
-    } catch (err){
+    } catch (err) {
         console.log("Error in updating WhiteSource: " + jsonResponse.data);
         process.exit(1);
     }
@@ -337,9 +349,9 @@ function getRejectionList(data) {
                 // There is a rejected policy
                 if (policyIndex !== -1 && currentNode.policy.actionType === 'Reject') {
                     var rejectionInfo = {
-                            resourceName: currentNode.resource.displayName,
-                            policyName: currentNode.policy.displayName
-                        };
+                        resourceName: currentNode.resource.displayName,
+                        policyName: currentNode.policy.displayName
+                    };
                     rejectionList.push(rejectionInfo);
                 } else {
                     // Keep on going
@@ -356,7 +368,7 @@ function getRejectionList(data) {
 }
 
 function getDependencyInfo(fileName, path, modified) {
-    if(fileName.toLowerCase().match(constants.JS_SCRIPT_REGEX)) {
+    if (fileName.toLowerCase().match(constants.JS_SCRIPT_REGEX)) {
 
     }
     var sha1AndOtherPlatformSha1 = HashCalculator.getSha1(path);
