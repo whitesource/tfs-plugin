@@ -78,7 +78,7 @@ function findProxySettings() {
 
     if (proxy) {
         console.log('Proxy settings detected.');
-        // check if there are proxy credentials and construct the proxy url with credentials
+        // check if there are proxy credentials  and construct the proxy url with credentials
         if (proxyUsername && proxyPassword) {
             httpsProxy = getAuthenticatedProxy(proxyUsername, proxyPassword);
         } else if (tl.getVariable('VSTS_HTTP_PROXY_USERNAME') && tl.getVariable('VSTS_HTTP_PROXY_PASSWORD')) {
