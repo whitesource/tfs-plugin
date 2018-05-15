@@ -173,6 +173,7 @@ function createPostRequest(type) {
         "agentVersion": PLUGIN_VERSION,
         "type": type,
         "token": ServiceAuthorization.parameters.apitoken,
+        "userKey": ServiceAuthorization.parameters.userKey,
         "timeStamp": new Date().getTime(),
         "product": Product,
         "productVersion": ProductVersion,

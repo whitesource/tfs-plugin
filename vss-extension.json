@@ -1,7 +1,7 @@
 {
   "manifestVersion": 1,
   "id": "whitesource",
-  "version": "18.2.1",
+  "version": "18.5.1-SNAPSHOT",
   "name": "WhiteSource",
   "description": "Detect & fix security vulnerabilities, problematic open source licenses and quality issues.",
   "publisher": "whitesource",
@@ -70,7 +70,19 @@
         ],
         "authenticationSchemes": [
           {
-            "type": "ms.vss-endpoint.endpoint-auth-scheme-token"
+            "type": "ms.vss-endpoint.endpoint-auth-scheme-token",
+            "inputDescriptors": [
+              {
+                "id": "userKey",
+                "name": "User Key",
+                "description": "Unique identifier of the organization to update can be retrieved from the admin page in your WhiteSource account",
+                "inputMode": "textbox",
+                "validation": {
+                  "isRequired": false,
+                  "dataType": "string"
+                }
+              }
+            ]
           }
         ],
         "helpMarkDown": "<a href=\"http://www.whitesourcesoftware.com/tfs_security\" target=\"_blank\"><b>Learn More</b></a>"
