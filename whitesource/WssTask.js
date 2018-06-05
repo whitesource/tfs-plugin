@@ -39,7 +39,7 @@ const connectionTimeoutField = tl.getInput('connectionTimeoutField', false);
 
 
 // General global variables
-const PLUGIN_VERSION = '18.5.1';
+const PLUGIN_VERSION = '18.5.2';
 const REQUEST_TYPE = {
     CHECK_POLICY_COMPLIANCE: 'CHECK_POLICY_COMPLIANCE',
     UPDATE: 'UPDATE'
