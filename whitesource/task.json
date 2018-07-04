@@ -11,8 +11,8 @@
   "author": "WhiteSource",
   "version": {
     "Major": 18,
-    "Minor": 5,
-    "Patch": 2
+    "Minor": 6,
+    "Patch": 3
   },
   "demands": [
     "node.js"
@@ -162,6 +162,22 @@
       "defaultValue": null,
       "required": false,
       "helpMarkDown": "Default value - 60 minutes"
+    },
+    {
+      "name": "connectionRetries",
+      "type": "integer",
+      "label": "Connection Retries",
+      "defaultValue": 1,
+      "required": false,
+      "helpMarkDown": "Connection retries when unable to connect to WhiteSource service (default value - 1)"
+    },
+    {
+      "name": "connectionRetriesInterval",
+      "type": "integer",
+      "label": "Connection Retries Interval",
+      "defaultValue": 3,
+      "required": false,
+      "helpMarkDown": "Connection intervals (default value is: 3)."
     }
   ],
   "files": {

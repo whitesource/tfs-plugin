@@ -36,10 +36,12 @@ var proxy = tl.getInput('proxyUrl', false);
 const proxyUsername = tl.getInput('proxyUsername', false);
 const proxyPassword = tl.getInput('proxyPassword', false);
 const connectionTimeoutField = tl.getInput('connectionTimeoutField', false);
+var connectionRetries = tl.getInput('connectionRetries', 1);
+const connectionRetriesInterval = tl.getInput('connectionRetriesInterval', 3);
 
 
 // General global variables
-const PLUGIN_VERSION = '18.5.2';
+const PLUGIN_VERSION = '18.6.3';
 const REQUEST_TYPE = {
     CHECK_POLICY_COMPLIANCE: 'CHECK_POLICY_COMPLIANCE',
     UPDATE: 'UPDATE'
@@ -59,7 +61,7 @@ function runPlugin() {
 
     var checkPolicyComplianceRequest = createFullRequest(REQUEST_TYPE.CHECK_POLICY_COMPLIANCE, dependencies);
     console.log('Sending check policies request to WhiteSource server');
-    sendRequest(checkPolicyComplianceRequest, onErrorRequest, function (responseBody) {
+    sendRequest(checkPolicyComplianceRequest, onErrorRequest, connectionRetries, function (responseBody) {
         tl.debug('Check policies response: ' + JSON.stringify(responseBody));
         onCheckPolicyComplianceSuccess(responseBody);
         var updateRequest = createFullRequest(REQUEST_TYPE.UPDATE, dependencies);
@@ -179,18 +181,22 @@ function createPostRequest(type) {
         "productVersion": ProductVersion,
         "requesterEmail": RequesterEmail,
         "projectToken": ProjectToken,
-        "forceCheckAllDependencies": isForceCheckAllDependencies
+        "forceCheckAllDependencies": isForceCheckAllDependencies,
+        "connectionRetries": connectionRetries,
+        "connectionRetriesInterval": connectionRetriesInterval
     });
 }
 
-function sendRequest(fullRequest, onError, onSuccess) {
+function sendRequest(fullRequest, onError, connectionRetries, onSuccess) {
     tl.debug('Full post request as sent to server: ' + JSON.stringify(fullRequest));
+    var statusCode;
     request(fullRequest, function (err, response, responseBody) {
         if (err && onError) {
             onError(err);
         }
+        console.log()
         if (response) {
-            var statusCode = response.statusCode;
+            statusCode = response.statusCode;
             if ((statusCode >= 200 && statusCode < 300) || statusCode === 304) {
                 if (onSuccess) {
                     onSuccess(responseBody);
@@ -209,11 +215,20 @@ function sendRequest(fullRequest, onError, onSuccess) {
                 console.log('##vso[task.complete result=Failed]');
                 process.exit(1);
             } else {
-                console.log('Response status code ' + statusCode + '\nUnable to proceed with request');
-                tl.debug('Entire http response is:\n' + JSON.stringify(response));
-                console.log('Unable to proceed with WhiteSource task.');
-                console.log('##vso[task.complete result=Failed]');
-                process.exit(1);
+                 console.log('Response status code ' + statusCode + '\nUnable to proceed with request');
+                 tl.debug('Entire http response is:\n' + JSON.stringify(response));
+                 console.log('Unable to proceed with WhiteSource task.');
+                 console.log('##vso[task.complete result=Failed]');
+                 //process.exit(1);
+                if (connectionRetries >= 0) {
+                    console.error("Failed to send request to WhiteSource server");
+                    if (connectionRetries > 0) {
+                        connectionRetries--;
+                        console.error("Trying " + (connectionRetries + 1) + " more time" + (connectionRetries != 0 ? "s" : ""));
+                        setSleepTimeOut(connectionRetriesInterval * 1000)
+                        sendRequest(fullRequest, onError, connectionRetries, onSuccess);
+                    }
+                }
             }
         }
     });
@@ -267,7 +282,7 @@ function sendUpdateRequest(updateRequest) {
             console.log('Sending force update inventory request to WhiteSource server');
             tl.debug('Full force update post request: ' + JSON.stringify(updateRequest));
 
-            sendRequest(updateRequest, onErrorRequest, function (responseBody) {
+            sendRequest(updateRequest, onErrorRequest, connectionRetries, function (responseBody) {
                 tl.debug("Force update response: " + JSON.stringify(responseBody));
                 console.log('warning', "Inventory was updated even though some dependencies violate policies.");
                 showUpdateServerResponse(responseBody);
@@ -280,7 +295,7 @@ function sendUpdateRequest(updateRequest) {
         }
     } else {
         console.log('Sending update inventory request to WhiteSource server');
-        sendRequest(updateRequest, onErrorRequest, function (responseBody) {
+        sendRequest(updateRequest, onErrorRequest, connectionRetries, function (responseBody) {
             tl.debug("Update request response: " + JSON.stringify(responseBody));
             showUpdateServerResponse(responseBody);
         });
@@ -289,7 +304,7 @@ function sendUpdateRequest(updateRequest) {
 
 function onErrorRequest(err) {
     console.log("Error sending request:" + JSON.stringify(err));
-    if(err.code = "ESOCKETTIMEDOUT"){
+    if (err.code = "ESOCKETTIMEDOUT") {
         console.log("Please consider to update the 'Connection timeout' under your WhiteSource task settings");
     }
 
@@ -466,4 +481,10 @@ function getLastModifiedDate(path) {
 
 function logError(type, str) {
     console.log('##vso[task.logissue type=' + type + ']' + str);
+}
+
+function setSleepTimeOut(milSeconds) {
+    var e = new Date().getTime() + milSeconds;
+    while (new Date().getTime() <= e) {
+    }
 }
