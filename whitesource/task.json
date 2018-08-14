@@ -11,8 +11,8 @@
   "author": "WhiteSource",
   "version": {
     "Major": 18,
-    "Minor": 6,
-    "Patch": 3
+    "Minor": 8,
+    "Patch": 1
   },
   "demands": [
     "node.js"

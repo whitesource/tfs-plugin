@@ -103,7 +103,9 @@ function getAuthenticatedProxy(proxyUsername, proxyPassword) {
 
 function scanAllFiles() {
     console.log('Start discovering project folder files');
-    var readDirObject = readDirRecursive(Cwd); // list the directory files recursively
+    // TODO Add flag that set the depth
+    var maxDepthSymbolicLink = 5;
+    var readDirObject = readDirRecursive(Cwd, [], 0, maxDepthSymbolicLink); // list the directory files recursively
     var notPermittedFolders = readDirObject.notPermittedFolders;
 
     if (notPermittedFolders.length !== 0) {
@@ -421,7 +423,7 @@ function isJson(str) {
     return true;
 }
 
-function readDirRecursive(dir, fileList) {
+function readDirRecursive(dir, fileList, currentDepthSymbolicLink, maxDepthSymbolicLink) {
     var notPermittedFolders = [];
     try {
         var files = fs.readdirSync(dir);
@@ -437,23 +439,38 @@ function readDirRecursive(dir, fileList) {
     for (var i = 0; i < files.length; i++) {
         var file = files[i];
         try {
-            fs.statSync(dir + path.sep + file).isDirectory();
+            var statsFile = fs.statSync(dir + path.sep + file);
+            var fullPath = dir + path.sep + file;
+            var fileIsSymbolicLink = fs.lstatSync(fullPath).isSymbolicLink();
+            if (filter(fullPath)) {
+                //skip -> Exclude list
+            } else {
+                var newCurrentDepthSymbolicLink = currentDepthSymbolicLink;
+                if (fileIsSymbolicLink) {
+                    if (newCurrentDepthSymbolicLink === maxDepthSymbolicLink) {
+                        logError('error', "Skipping symbolic link "
+                            + fullPath
+                            + " -- too many levels of symbolic"
+                            + " links.");
+                        continue;
+                    } else {
+                        newCurrentDepthSymbolicLink++;
+                    }
+                } else {
+                    newCurrentDepthSymbolicLink = 0;
+                }
+                if (statsFile.isDirectory()) {
+                    readDirObject = readDirRecursive(fullPath, fileList, newCurrentDepthSymbolicLink, maxDepthSymbolicLink);
+                    fileList = readDirObject.fileList;
+                } else {
+                    fileList.push({'name': file, 'path': dir});
+                }
+            }
         }
         catch (err) {
             logError('error', err);
             notPermittedFolders.push(file);
             continue;
-        }
-
-        var fullPath = dir + path.sep + file;
-        if (filter(fullPath)) {
-            //skip -> Exclude list
-        }
-        else if (fs.statSync(fullPath).isDirectory()) {
-            readDirObject = readDirRecursive(fullPath, fileList);
-            fileList = readDirObject.fileList;
-        } else {
-            fileList.push({'name': file, 'path': dir});
         }
     }
     return {
