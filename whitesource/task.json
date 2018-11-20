@@ -11,7 +11,7 @@
   "author": "WhiteSource",
   "version": {
     "Major": 18,
-    "Minor": 8,
+    "Minor": 11,
     "Patch": 1
   },
   "demands": [
@@ -22,6 +22,14 @@
   },
   "minimumAgentVersion": "1.91.0",
   "instanceNameFormat": "WhiteSource $(message)",
+  "groups": [
+    {
+
+      "name": "advanced",
+      "displayName": "Advanced",
+      "isExpanded": true
+    }
+  ],
   "inputs": [
     {
       "name": "cwd",
@@ -60,12 +68,34 @@
       }
     },
     {
-      "name": "productNameOrToken",
+      "name": "productRule",
+      "type": "radio",
+      "label": "Product identifier",
+      "required": false,
+      "defaultValue": "productName",
+      "helpMarkDown": "Select the identifier for the relevant product. Identifier can be either 'Product name' or 'Product token'.",
+      "options": {
+        "productName": "Product name",
+        "productToken": "Product token"
+      }
+    },
+    {
+      "name": "productName",
       "type": "string",
-      "label": "Product name or token",
+      "label": "Product name",
       "defaultValue": "",
       "required": false,
-      "helpMarkDown": "Name or token to uniquely identify the product to update. Tokens can be found in the administration section of your WhiteSource account. if you don't have any please contact your WhiteSource account administrator"
+      "helpMarkDown": "A name that uniquely identifies the product to create or update. If you are creating a new product, then enter a unique name for the new product. If you are updating an existing product, then provide its name, which can be found on the WhiteSource GUI (on the GUI, select 'Products' from the main navigation menu, and then select 'View All' to view all your existing products).",
+      "visibleRule": "productRule=productName"
+    },
+    {
+      "name": "productToken",
+      "type": "string",
+      "label": "Product token",
+      "defaultValue": "",
+      "required": false,
+      "helpMarkDown": "A token that uniquely identifies the existing product to update. Product tokens can be found on the 'Integrate' page within the WhiteSource GUI. If you do not have access to this page, then please contact your WhiteSource account administrator.",
+      "visibleRule": "productRule=productToken"
     },
     {
       "name": "productVersion",
@@ -84,20 +114,34 @@
       "helpMarkDown": "Email of the WhiteSource user that requests to update WhiteSource."
     },
     {
+      "name": "projectRule",
+      "type": "radio",
+      "label": "Project identifier",
+      "required": true,
+      "defaultValue": "projectName",
+      "helpMarkDown": "Select the identifier for the relevant project. Identifier can be either 'Project name' or 'Project token'.",
+      "options": {
+        "projectName": "Project name",
+        "projectToken": "Project token"
+      }
+    },
+    {
       "name": "projectName",
       "type": "string",
       "label": "Project name",
       "defaultValue": "$(Build.Repository.Name)",
       "required": true,
-      "helpMarkDown": "Whitesource project name"
+      "helpMarkDown": "A name that uniquely identifies the project to create or update. If you are creating a new project, then enter a unique name for the new project. If you are updating an existing project, then provide its name, which can be found on the WhiteSource GUI (on the GUI, select 'Projects' from the main navigation menu, and then select 'View All' to view all your existing projects).",
+      "visibleRule": "projectRule=projectName"
     },
     {
       "name": "projectToken",
       "type": "string",
       "label": "Project token",
       "defaultValue": "",
-      "required": false,
-      "helpMarkDown": "Token uniquely identifying the project to update. Tokens can be found in the administration section of your WhiteSource account.If you don't have any please contact your WhiteSource account administrator."
+      "required": true,
+      "helpMarkDown": "A token that uniquely identifies the existing project to update. Project tokens can be found on the 'Integrate' page within the WhiteSource GUI. If you do not have access to this page, then please contact your WhiteSource account administrator.",
+      "visibleRule": "projectRule=projectToken"
     },
     {
       "name": "forceCheckAllDependencies",

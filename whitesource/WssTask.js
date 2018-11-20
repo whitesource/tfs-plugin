@@ -21,15 +21,16 @@ const Cwd = tl.getPathInput('cwd', false);
 
 // User Mandatory Fields
 const CheckPoliciesAction = tl.getInput('checkPolicies', true);
-const ProjectName = tl.getInput('projectName', true);
+var ProjectName = tl.getInput('projectName', false);
 const IncludedExtensions = tl.getDelimitedInput('extensions', ' ', true);
 
 // User Optional Fields
 const ExcludeFolders = tl.getDelimitedInput('exclude', ' ', false);
-const Product = tl.getInput('productNameOrToken', false);
+var productName = tl.getInput('productName', false);
+var productToken = tl.getInput('productToken', false);
 const ProductVersion = tl.getInput('productVersion', false);
 const RequesterEmail = tl.getInput('requesterEmail', false);
-const ProjectToken = tl.getInput('projectToken', false);
+var ProjectToken = tl.getInput('projectToken', false);
 const isForceCheckAllDependencies = tl.getInput('forceCheckAllDependencies', false);
 const isForceUpdate = tl.getInput('forceUpdate', false);
 var proxy = tl.getInput('proxyUrl', false);
@@ -38,7 +39,8 @@ const proxyPassword = tl.getInput('proxyPassword', false);
 const connectionTimeoutField = tl.getInput('connectionTimeoutField', false);
 var connectionRetries = tl.getInput('connectionRetries', 1);
 const connectionRetriesInterval = tl.getInput('connectionRetriesInterval', 3);
-
+const projectRule = tl.getInput('projectRule',true);
+const productRule = tl.getInput('productRule',true);
 
 // General global variables
 const PLUGIN_VERSION = '18.6.3';
@@ -55,6 +57,7 @@ var httpsProxy = undefined;
 runPlugin();
 
 function runPlugin() {
+    checkProjectAndProduct();
     findProxySettings();
     var scannedFiles = scanAllFiles();
     var dependencies = getDependenciesFromFiles(scannedFiles.fileList);
@@ -145,7 +148,8 @@ function createFullRequest(requestType, dependencies) {
             "artifactId": ProjectName,
             "version": "1.0.0"
         },
-        "dependencies": dependencies
+        "dependencies": dependencies,
+        "projectToken": ProjectToken,
     }];
     if (connectionTimeoutField != null) {
         connectionTimeout = connectionTimeoutField * 60 * 1000;
@@ -172,6 +176,7 @@ function createFullRequest(requestType, dependencies) {
 }
 
 function createPostRequest(type) {
+
     return querystring.stringify({
         "agent": "tfs-plugin",
         "agentVersion": PLUGIN_VERSION,
@@ -179,7 +184,8 @@ function createPostRequest(type) {
         "token": ServiceAuthorization.parameters.apitoken,
         "userKey": ServiceAuthorization.parameters.userKey,
         "timeStamp": new Date().getTime(),
-        "product": Product,
+        "productToken": productToken,
+        "product": productName,
         "productVersion": ProductVersion,
         "requesterEmail": RequesterEmail,
         "projectToken": ProjectToken,
@@ -503,5 +509,20 @@ function logError(type, str) {
 function setSleepTimeOut(milSeconds) {
     var e = new Date().getTime() + milSeconds;
     while (new Date().getTime() <= e) {
+    }
+}
+
+function checkProjectAndProduct() {
+    if (projectRule === "projectToken" && ProjectName !== '')  {
+        ProjectName = "";
+    }
+    else if (projectRule === "projectName" && ProjectToken !== ''){
+        ProjectToken = "";
+    }
+    else if (productRule === "productName" && productToken !== ''){
+        productToken = "";
+    }
+    else if (productRule === "productToken" && productName !== ''){
+        productName = "";
     }
 }
