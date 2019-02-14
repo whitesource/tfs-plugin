@@ -39,8 +39,8 @@ const proxyPassword = tl.getInput('proxyPassword', false);
 const connectionTimeoutField = tl.getInput('connectionTimeoutField', false);
 var connectionRetries = tl.getInput('connectionRetries', 1);
 const connectionRetriesInterval = tl.getInput('connectionRetriesInterval', 3);
-const projectRule = tl.getInput('projectRule',true);
-const productRule = tl.getInput('productRule',true);
+const projectRule = tl.getInput('projectRule', true);
+const productRule = tl.getInput('productRule', true);
 
 // General global variables
 const PLUGIN_VERSION = '18.6.3';
@@ -223,11 +223,11 @@ function sendRequest(fullRequest, onError, connectionRetries, onSuccess) {
                 console.log('##vso[task.complete result=Failed]');
                 process.exit(1);
             } else {
-                 console.log('Response status code ' + statusCode + '\nUnable to proceed with request');
-                 tl.debug('Entire http response is:\n' + JSON.stringify(response));
-                 console.log('Unable to proceed with WhiteSource task.');
-                 console.log('##vso[task.complete result=Failed]');
-                 //process.exit(1);
+                console.log('Response status code ' + statusCode + '\nUnable to proceed with request');
+                tl.debug('Entire http response is:\n' + JSON.stringify(response));
+                console.log('Unable to proceed with WhiteSource task.');
+                console.log('##vso[task.complete result=Failed]');
+                //process.exit(1);
                 if (connectionRetries >= 0) {
                     console.error("Failed to send request to WhiteSource server");
                     if (connectionRetries > 0) {
@@ -401,6 +401,11 @@ function getDependencyInfo(fileName, path, modified) {
     if (hashCalculationResult != null) {
         tl.debug("fullFileHash: " + hashCalculationResult.fullHash + ", mostSigBitsHash: " + hashCalculationResult.mostSigBitsHash + ", leastSigBitsHash: " + hashCalculationResult.leastSigBitsHash);
     }
+    fileName = encodeURIComponent(fileName);
+    var i = path.lastIndexOf('\\');
+    if (i !== -1) {
+        path = path.substr(0, i) + "\\" + fileName;
+    }
     return {
         "artifactId": fileName,
         "sha1": sha1AndOtherPlatformSha1.sha1,
@@ -513,16 +518,16 @@ function setSleepTimeOut(milSeconds) {
 }
 
 function checkProjectAndProduct() {
-    if (projectRule === "projectToken" && ProjectName !== '')  {
+    if (projectRule === "projectToken" && ProjectName !== '') {
         ProjectName = "";
     }
-    else if (projectRule === "projectName" && ProjectToken !== ''){
+    else if (projectRule === "projectName" && ProjectToken !== '') {
         ProjectToken = "";
     }
-    else if (productRule === "productName" && productToken !== ''){
+    else if (productRule === "productName" && productToken !== '') {
         productToken = "";
     }
-    else if (productRule === "productToken" && productName !== ''){
+    else if (productRule === "productToken" && productName !== '') {
         productName = "";
     }
 }
