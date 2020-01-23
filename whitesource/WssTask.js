@@ -31,6 +31,7 @@ var productToken = tl.getInput('productToken', false);
 const ProductVersion = tl.getInput('productVersion', false);
 const RequesterEmail = tl.getInput('requesterEmail', false);
 var ProjectToken = tl.getInput('projectToken', false);
+const ProjectVersion = tl.getInput('projectVersion', false);
 const isForceCheckAllDependencies = tl.getInput('forceCheckAllDependencies', false);
 const isForceUpdate = tl.getInput('forceUpdate', false);
 var proxy = tl.getInput('proxyUrl', false);
@@ -189,6 +190,7 @@ function createPostRequest(type) {
         "productVersion": ProductVersion,
         "requesterEmail": RequesterEmail,
         "projectToken": ProjectToken,
+        "projectVersion": ProjectVersion,
         "forceCheckAllDependencies": isForceCheckAllDependencies,
         "connectionRetries": connectionRetries,
         "connectionRetriesInterval": connectionRetriesInterval
