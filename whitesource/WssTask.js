@@ -43,7 +43,7 @@ const projectRule = tl.getInput('projectRule', true);
 const productRule = tl.getInput('productRule', true);
 
 // General global variables
-const PLUGIN_VERSION = '18.6.3';
+const PLUGIN_VERSION = '20.5.1';
 const REQUEST_TYPE = {
     CHECK_POLICY_COMPLIANCE: 'CHECK_POLICY_COMPLIANCE',
     UPDATE: 'UPDATE'
