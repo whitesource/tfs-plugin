@@ -41,7 +41,7 @@ let productToken = tl.getInput('productToken', false);
 let productVersion = tl.getInput('productVersion', false);
 
 // General global variables
-const PLUGIN_VERSION = '20.5.3';
+const PLUGIN_VERSION = '20.5.2';
 const REQUEST_TYPE = {
     CHECK_POLICY_COMPLIANCE: 'CHECK_POLICY_COMPLIANCE',
     UPDATE: 'UPDATE'
