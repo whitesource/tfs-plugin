@@ -1,7 +1,7 @@
 {
   "manifestVersion": 1,
   "id": "whitesource",
-  "version": "20.5.1",
+  "version": "20.5.3",
   "name": "WhiteSource for Azure DevOps Server",
   "description": "Detect & fix security vulnerabilities, problematic open source licenses and quality issues.",
   "publisher": "whitesource",

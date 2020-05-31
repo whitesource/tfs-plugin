@@ -17,5 +17,6 @@ module.exports = Object.freeze({
     JS_SCRIPT_REGEX: /.*\.js/,
     MAX_FILE_SIZE: 10 * 1024 * 1024,
     CRLF: "\r\n",
-    NOT_CRLF: "\n"
+    NOT_CRLF: "\n",
+    GLOB_PATTERN: "**/*"
 });
