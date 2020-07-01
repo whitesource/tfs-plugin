@@ -10,9 +10,9 @@
   ],
   "author": "WhiteSource",
   "version": {
-    "Major": 19,
-    "Minor": 9,
-    "Patch": 1
+    "Major": 20,
+    "Minor": 5,
+    "Patch": 2
   },
   "demands": [
     "node.js"

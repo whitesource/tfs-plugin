@@ -1,58 +1,56 @@
 // Import libraries
-var fs = require('fs'),
-    path = require('path'),
-    crypto = require('crypto'),
+const fs = require('fs'),
     moment = require('moment'),
     querystring = require('querystring'),
     tl = require('vsts-task-lib/task'),
-    fileMatch = require('file-match'),
     request = require('request'),
-    httpsProxyAgent = require('https-proxy-agent');
-var HashCalculator = require('./HashCalculator');
-var constants = require('./constants');
-var connectionTimeout = 3600000;
+    httpsProxyAgent = require('https-proxy-agent'),
+    globAll = require('glob-all');
+
+const hashCalculator = require('./HashCalculator');
+const constants = require('./constants');
 
 // Plugin configuration params
-
-const WsService = tl.getInput('WhiteSourceService', false);
-const DestinationUrl = tl.getEndpointUrl(WsService, false);
-const ServiceAuthorization = tl.getEndpointAuthorization(WsService, false);
-const Cwd = tl.getPathInput('cwd', false);
+const wssService = tl.getInput('WhiteSourceService', false);
+const destinationUrl = tl.getEndpointUrl(wssService, false);
+const serviceAuthorization = tl.getEndpointAuthorization(wssService, false);
+const cwd = tl.getPathInput('cwd', false);
 
 // User Mandatory Fields
-const CheckPoliciesAction = tl.getInput('checkPolicies', true);
-var ProjectName = tl.getInput('projectName', false);
-const IncludedExtensions = tl.getDelimitedInput('extensions', ' ', true);
+const checkPolicies = tl.getInput('checkPolicies', true);
+const includedExtensions = tl.getDelimitedInput('extensions', ' ', true);
 
 // User Optional Fields
-const ExcludeFolders = tl.getDelimitedInput('exclude', ' ', false);
-var productName = tl.getInput('productName', false);
-var productToken = tl.getInput('productToken', false);
-const ProductVersion = tl.getInput('productVersion', false);
-const RequesterEmail = tl.getInput('requesterEmail', false);
-var ProjectToken = tl.getInput('projectToken', false);
-const ProjectVersion = tl.getInput('projectVersion', false);
+const excludeFolders = tl.getDelimitedInput('exclude', ' ', false);
+const requesterEmail = tl.getInput('requesterEmail', false);
 const isForceCheckAllDependencies = tl.getInput('forceCheckAllDependencies', false);
 const isForceUpdate = tl.getInput('forceUpdate', false);
-var proxy = tl.getInput('proxyUrl', false);
 const proxyUsername = tl.getInput('proxyUsername', false);
 const proxyPassword = tl.getInput('proxyPassword', false);
 const connectionTimeoutField = tl.getInput('connectionTimeoutField', false);
-var connectionRetries = tl.getInput('connectionRetries', 1);
+const connectionRetries = tl.getInput('connectionRetries', 1);
 const connectionRetriesInterval = tl.getInput('connectionRetriesInterval', 3);
 const projectRule = tl.getInput('projectRule', true);
 const productRule = tl.getInput('productRule', true);
 
+let proxy = tl.getInput('proxyUrl', false);
+let projectName = tl.getInput('projectName', false);
+let projectToken = tl.getInput('projectToken', false);
+let projectVersion = tl.getInput('projectVersion', false);
+let productName = tl.getInput('productName', false);
+let productToken = tl.getInput('productToken', false);
+let productVersion = tl.getInput('productVersion', false);
+
 // General global variables
-const PLUGIN_VERSION = '18.6.3';
+const PLUGIN_VERSION = '20.5.2';
 const REQUEST_TYPE = {
     CHECK_POLICY_COMPLIANCE: 'CHECK_POLICY_COMPLIANCE',
     UPDATE: 'UPDATE'
 };
 
-var foundRejections = false;
-var filter = fileMatch(ExcludeFolders);
-var httpsProxy = undefined;
+let foundRejections = false;
+let httpsProxy = undefined;
+let connectionTimeout = 3600000;
 
 // Run actual plugin work
 runPlugin();
@@ -60,15 +58,16 @@ runPlugin();
 function runPlugin() {
     checkProjectAndProduct();
     findProxySettings();
-    var scannedFiles = scanAllFiles();
-    var dependencies = getDependenciesFromFiles(scannedFiles.fileList);
 
-    var checkPolicyComplianceRequest = createFullRequest(REQUEST_TYPE.CHECK_POLICY_COMPLIANCE, dependencies);
+    let scannedFiles = getAllFilesToScan();
+    let dependencies = getDependenciesFromFiles(scannedFiles);
+
+    let checkPolicyComplianceRequest = createFullRequest(REQUEST_TYPE.CHECK_POLICY_COMPLIANCE, dependencies);
     console.log('Sending check policies request to WhiteSource server');
     sendRequest(checkPolicyComplianceRequest, onErrorRequest, connectionRetries, function (responseBody) {
         tl.debug('Check policies response: ' + JSON.stringify(responseBody));
         onCheckPolicyComplianceSuccess(responseBody);
-        var updateRequest = createFullRequest(REQUEST_TYPE.UPDATE, dependencies);
+        let updateRequest = createFullRequest(REQUEST_TYPE.UPDATE, dependencies);
         sendUpdateRequest(updateRequest)
     });
 }
@@ -98,67 +97,65 @@ function findProxySettings() {
 }
 
 function getAuthenticatedProxy(proxyUsername, proxyPassword) {
-    var index = proxy.lastIndexOf('://') + 3; // the actual index of '/'
-    var authenticatedProxy = proxy.substr(0, index) + proxyUsername + ':' +
+    let index = proxy.lastIndexOf('://') + 3; // the actual index of '/'
+    let authenticatedProxy = proxy.substr(0, index) + proxyUsername + ':' +
         proxyPassword + '@' + proxy.substr(index, proxy.length);
     console.log('Proxy username and password found.');
     return new httpsProxyAgent(authenticatedProxy);
 }
 
-function scanAllFiles() {
+function getAllFilesToScan() {
     console.log('Start discovering project folder files');
-    // TODO Add flag that set the depth
-    var maxDepthSymbolicLink = 5;
-    var readDirObject = readDirRecursive(Cwd, [], 0, maxDepthSymbolicLink); // list the directory files recursively
-    var notPermittedFolders = readDirObject.notPermittedFolders;
 
-    if (notPermittedFolders.length !== 0) {
-        console.log('Skipping the following folders due to insufficient permissions:');
-        console.log('---------------------------------------------------------------');
-        notPermittedFolders.forEach(function (folder) {
-            console.log(folder);
-        });
-        console.log('---------------------------------------------------------------');
-    }
-    tl.debug('Scan files result: ' + JSON.stringify(readDirObject));
+    let includePatterns = [];
+
+    // Add glob pattern '**/*" to extensions to search them in all project
+    includedExtensions.forEach(function (extension) {
+        includePatterns.push(constants.GLOB_PATTERN + extension);
+    });
+
+    // Sync all files that meet the requirements - included extensions and excludeFolders patterns
+    // Returned files are with absolute path since "absolute" is true in options
+    const globOptions = {cwd: cwd, dot: true, nodir: true, absolute: true, ignore: excludeFolders};
+    let allFilesToScan = globAll.sync(includePatterns, globOptions);
+
+    tl.debug('Scan files result: ' + JSON.stringify(allFilesToScan));
     console.log('Finished discovering all files');
-    return readDirObject;
+    return allFilesToScan;
 }
 
 function getDependenciesFromFiles(files) {
-    var dependencies = [];
+    let dependencies = [];
 
     files.forEach(function (file) {
-        var fullPath = file.path + path.sep + file.name;
-        if (isFile(fullPath) && isExtensionRight(file.name)) {
-            var lastModified = getLastModifiedDate(fullPath);
-            var dependency = getDependencyInfo(file.name, fullPath, lastModified);
-            if (dependency) {
-                dependencies.push(dependency);
-            }
+        let lastModified = getLastModifiedDate(file);
+        let dependency = getDependencyInfo(file, lastModified);
+        if (dependency) {
+            dependencies.push(dependency);
         }
     });
+
     console.log('Suspected dependencies found: ' + dependencies.length);
     tl.debug('All suspected dependency infos: ' + JSON.stringify(dependencies));
     return dependencies;
 }
 
 function createFullRequest(requestType, dependencies) {
-    var requestInventory = [{
+    let requestInventory = [{
         "coordinates": {
-            "artifactId": ProjectName,
+            "artifactId": projectName,
             "version": "1.0.0"
         },
         "dependencies": dependencies,
-        "projectToken": ProjectToken,
+        "projectToken": projectToken,
     }];
     if (connectionTimeoutField != null) {
         connectionTimeout = connectionTimeoutField * 60 * 1000;
     }
 
-    var body = createPostRequest(requestType) + "&diff=" + JSON.stringify(requestInventory);
+    let body = createPostRequest(requestType) + "&diff=" + JSON.stringify(requestInventory);
 
-    var request = {
+    let request = {
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
             'Charset': 'utf-8'
@@ -166,7 +163,7 @@ function createFullRequest(requestType, dependencies) {
         body: body,
         timeout: connectionTimeout,
         method: 'post',
-        url: DestinationUrl
+        url: destinationUrl
     };
 
     if (httpsProxy) {
@@ -182,15 +179,15 @@ function createPostRequest(type) {
         "agent": "tfs-plugin",
         "agentVersion": PLUGIN_VERSION,
         "type": type,
-        "token": ServiceAuthorization.parameters.apitoken,
-        "userKey": ServiceAuthorization.parameters.userKey,
+        "token": serviceAuthorization.parameters.apitoken,
+        "userKey": serviceAuthorization.parameters.userKey,
         "timeStamp": new Date().getTime(),
         "productToken": productToken,
         "product": productName,
-        "productVersion": ProductVersion,
-        "requesterEmail": RequesterEmail,
-        "projectToken": ProjectToken,
-        "projectVersion": ProjectVersion,
+        "productVersion": productVersion,
+        "requesterEmail": requesterEmail,
+        "projectToken": projectToken,
+        "projectVersion": projectVersion,
         "forceCheckAllDependencies": isForceCheckAllDependencies,
         "connectionRetries": connectionRetries,
         "connectionRetriesInterval": connectionRetriesInterval
@@ -199,12 +196,13 @@ function createPostRequest(type) {
 
 function sendRequest(fullRequest, onError, connectionRetries, onSuccess) {
     tl.debug('Full post request as sent to server: ' + JSON.stringify(fullRequest));
-    var statusCode;
+    let statusCode;
     request(fullRequest, function (err, response, responseBody) {
         if (err && onError) {
             onError(err);
         }
-        console.log()
+        console.log();
+
         if (response) {
             statusCode = response.statusCode;
             if ((statusCode >= 200 && statusCode < 300) || statusCode === 304) {
@@ -229,7 +227,7 @@ function sendRequest(fullRequest, onError, connectionRetries, onSuccess) {
                 tl.debug('Entire http response is:\n' + JSON.stringify(response));
                 console.log('Unable to proceed with WhiteSource task.');
                 console.log('##vso[task.complete result=Failed]');
-                //process.exit(1);
+
                 if (connectionRetries >= 0) {
                     console.error("Failed to send request to WhiteSource server");
                     if (connectionRetries > 0) {
@@ -250,8 +248,7 @@ function onCheckPolicyComplianceSuccess(responseBody) {
             logError('error', 'Server responded with status "Bad Request", Please check your credentials');
             logError('error', 'Terminating Build');
             process.exit(1);
-        }
-        else if (responseBody.status === 3) { //STATUS_SERVER_ERROR
+        } else if (responseBody.status === 3) { //STATUS_SERVER_ERROR
             logError('error', 'Server responded with status "Server Error", please try again');
             logError('error', 'Terminating Build');
             process.exit(1);
@@ -265,22 +262,20 @@ function onCheckPolicyComplianceSuccess(responseBody) {
 
     try {
         var jsonResponse = JSON.parse(responseBody);
-
         var responseData = JSON.parse(jsonResponse.data);
     } catch (err) {
         logError('error', 'Unable to parse check policy response data, error: ' + err);
     }
 
     if (responseData) {
-        var rejectionList = getRejectionList(responseData);
+        let rejectionList = getRejectionList(responseData);
         if (rejectionList.length !== 0) {
             logError('warning', "Found " + rejectionList.length + ' policy rejections');
             rejectionList.forEach(function (rejection) {
                 logError('warning', 'Resource ' + rejection.resourceName + ' was rejected by policy "' + rejection.policyName + '"');
             });
             foundRejections = true;
-        }
-        else {
+        } else {
             console.log('All dependencies conform with open source policies.');
         }
     }
@@ -298,7 +293,7 @@ function sendUpdateRequest(updateRequest) {
                 showUpdateServerResponse(responseBody);
             });
         } else {
-            if (CheckPoliciesAction === "FAIL_ON_BUILD") {
+            if (checkPolicies === "FAIL_ON_BUILD") {
                 logError('error', 'Terminating Build upon policy violations');
                 process.exit(1);
             }
@@ -314,15 +309,15 @@ function sendUpdateRequest(updateRequest) {
 
 function onErrorRequest(err) {
     console.log("Error sending request:" + JSON.stringify(err));
-    if (err.code = "ESOCKETTIMEDOUT") {
+    if (err.code == "ESOCKETTIMEDOUT") {
         console.log("Please consider to update the 'Connection timeout' under your WhiteSource task settings");
     }
 
 }
 
 function showUpdateServerResponse(response) {
-    var jsonResponse = JSON.parse(response);
-    var responseData;
+    let jsonResponse = JSON.parse(response);
+    let responseData;
     try {
         responseData = JSON.parse(jsonResponse.data);
     } catch (err) {
@@ -351,7 +346,7 @@ function showUpdateServerResponse(response) {
 }
 
 function getRejectionList(data) {
-    var rejectionList = [];
+    let rejectionList = [];
     createRejectionList(data);
     return rejectionList;
 
@@ -371,10 +366,10 @@ function getRejectionList(data) {
             var objKeys = Object.keys(currentNode);
             if (objKeys.length !== 0) {
                 // The node is non empty object
-                var policyIndex = objKeys.indexOf('policy');
+                let policyIndex = objKeys.indexOf('policy');
                 // There is a rejected policy
                 if (policyIndex !== -1 && currentNode.policy.actionType === 'Reject') {
-                    var rejectionInfo = {
+                    let rejectionInfo = {
                         resourceName: currentNode.resource.displayName,
                         policyName: currentNode.policy.displayName
                     };
@@ -393,18 +388,19 @@ function getRejectionList(data) {
     }
 }
 
-function getDependencyInfo(fileName, path, modified) {
-    if (fileName.toLowerCase().match(constants.JS_SCRIPT_REGEX)) {
+function getDependencyInfo(path, modified) {
 
-    }
-    var sha1AndOtherPlatformSha1 = HashCalculator.getSha1(path);
-    var hashCalculationResult = HashCalculator.calculateSuperHash(path, fileName);
+    let fileName = getFileNameFromPath(path);
+    let sha1AndOtherPlatformSha1 = hashCalculator.getSha1(path);
+    let hashCalculationResult = hashCalculator.calculateSuperHash(path, fileName);
+
     tl.debug("Complete calculating Sha1 of " + path + " sha1: " + sha1AndOtherPlatformSha1.sha1 + " Other Platform Sha1: " + sha1AndOtherPlatformSha1.otherPlatformSha1);
     if (hashCalculationResult != null) {
         tl.debug("fullFileHash: " + hashCalculationResult.fullHash + ", mostSigBitsHash: " + hashCalculationResult.mostSigBitsHash + ", leastSigBitsHash: " + hashCalculationResult.leastSigBitsHash);
     }
+
     fileName = encodeURIComponent(fileName);
-    var i = path.lastIndexOf('\\');
+    let i = path.lastIndexOf('\\');
     if (i !== -1) {
         path = path.substr(0, i) + "\\" + fileName;
     }
@@ -428,84 +424,15 @@ function getDependencyInfo(fileName, path, modified) {
 function isJson(str) {
     try {
         JSON.parse(str);
-    }
-    catch (err) {
+    } catch (err) {
         logError('error', err);
         return false;
     }
     return true;
 }
 
-function readDirRecursive(dir, fileList, currentDepthSymbolicLink, maxDepthSymbolicLink) {
-    var notPermittedFolders = [];
-    try {
-        var files = fs.readdirSync(dir);
-    }
-    catch (err) {
-        logError('error', err);
-        return {
-            fileList: []
-        };
-    }
-
-    fileList = fileList || [];
-    for (var i = 0; i < files.length; i++) {
-        var file = files[i];
-        try {
-            var statsFile = fs.statSync(dir + path.sep + file);
-            var fullPath = dir + path.sep + file;
-            var fileIsSymbolicLink = fs.lstatSync(fullPath).isSymbolicLink();
-            if (filter(fullPath)) {
-                //skip -> Exclude list
-            } else {
-                var newCurrentDepthSymbolicLink = currentDepthSymbolicLink;
-                if (fileIsSymbolicLink) {
-                    if (newCurrentDepthSymbolicLink === maxDepthSymbolicLink) {
-                        logError('error', "Skipping symbolic link "
-                            + fullPath
-                            + " -- too many levels of symbolic"
-                            + " links.");
-                        continue;
-                    } else {
-                        newCurrentDepthSymbolicLink++;
-                    }
-                } else {
-                    newCurrentDepthSymbolicLink = 0;
-                }
-                if (statsFile.isDirectory()) {
-                    readDirObject = readDirRecursive(fullPath, fileList, newCurrentDepthSymbolicLink, maxDepthSymbolicLink);
-                    fileList = readDirObject.fileList;
-                } else {
-                    fileList.push({'name': file, 'path': dir});
-                }
-            }
-        }
-        catch (err) {
-            logError('error', err);
-            notPermittedFolders.push(file);
-            continue;
-        }
-    }
-    return {
-        fileList: fileList,
-        notPermittedFolders: notPermittedFolders
-    };
-}
-
-function isFile(path) {
-    var stats = fs.statSync(path);
-    return stats.isFile();
-}
-
-function isExtensionRight(file) {
-    var fileExtension = path.extname(file);
-    if (IncludedExtensions.indexOf(fileExtension) > -1) {
-        return true;
-    }
-}
-
 function getLastModifiedDate(path) {
-    var stats = fs.statSync(path);
+    let stats = fs.statSync(path);
     return moment(stats.mtime).format("MMM D, YYYY h:mm:ss A")
 }
 
@@ -514,22 +441,27 @@ function logError(type, str) {
 }
 
 function setSleepTimeOut(milSeconds) {
-    var e = new Date().getTime() + milSeconds;
+    let e = new Date().getTime() + milSeconds;
     while (new Date().getTime() <= e) {
     }
 }
 
+/*
+ * Get file name from file full path, Works for forward and backward slashes
+ * For example - filePath="C:\folderPath\myFileName.extension, Returns myFileName.extension
+ */
+function getFileNameFromPath(filePath) {
+    return filePath.replace(/^.*[\\\/]/, '');
+}
+
 function checkProjectAndProduct() {
-    if (projectRule === "projectToken" && ProjectName !== '') {
-        ProjectName = "";
-    }
-    else if (projectRule === "projectName" && ProjectToken !== '') {
-        ProjectToken = "";
-    }
-    else if (productRule === "productName" && productToken !== '') {
+    if (projectRule === "projectToken" && projectName !== '') {
+        projectName = "";
+    } else if (projectRule === "projectName" && projectToken !== '') {
+        projectToken = "";
+    } else if (productRule === "productName" && productToken !== '') {
         productToken = "";
-    }
-    else if (productRule === "productToken" && productName !== '') {
+    } else if (productRule === "productToken" && productName !== '') {
         productName = "";
     }
 }
