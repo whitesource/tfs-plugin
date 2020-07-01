@@ -144,6 +144,14 @@
       "visibleRule": "projectRule=projectToken"
     },
     {
+      "name": "projectVersion",
+      "type": "string",
+      "label": "Project version",
+      "defaultValue": "",
+      "required": false,
+      "helpMarkDown": "This is used to override any versions inferred by default. Version of the project to update."
+    },
+    {
       "name": "forceCheckAllDependencies",
       "type": "boolean",
       "label": "Force check all dependencies",
