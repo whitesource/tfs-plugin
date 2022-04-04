@@ -36,6 +36,7 @@ const productRule = tl.getInput('productRule', true);
 let proxy = tl.getInput('proxyUrl', false);
 let projectName = tl.getInput('projectName', false);
 let projectToken = tl.getInput('projectToken', false);
+let projectVersion = tl.getInput('projectVersion', false);
 let productName = tl.getInput('productName', false);
 let productToken = tl.getInput('productToken', false);
 let productVersion = tl.getInput('productVersion', false);
@@ -186,6 +187,7 @@ function createPostRequest(type) {
         "productVersion": productVersion,
         "requesterEmail": requesterEmail,
         "projectToken": projectToken,
+        "projectVersion": projectVersion,
         "forceCheckAllDependencies": isForceCheckAllDependencies,
         "connectionRetries": connectionRetries,
         "connectionRetriesInterval": connectionRetriesInterval
