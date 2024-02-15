@@ -15,7 +15,7 @@
     "vsts-task-lib": "^0.8.4",
     "object.values": "^1.0.4",
     "request": "^2.88.0",
-    "https-proxy-agent": "5.0.0",
+    "https-proxy-agent": "7.0.4",
     "convert-string": "^0.1.0",
     "hoek": "4.2.1",
     "cryptiles": "4.1.3",
